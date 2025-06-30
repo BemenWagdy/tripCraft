@@ -8,56 +8,95 @@ const schema = {
   parameters: {
     type: 'object',
     properties: {
-      intro: { type: 'string' },               // 3-4 lines
-      visa: { type: 'string' },               // visa rules
+      intro:   { type: 'string' },
+
+      beforeYouGo: {                      // ⬅️  new block
+        type: 'array',
+        description: '8-10 key facts to know before arrival',
+        items: { type: 'string' },
+        minItems: 8,  maxItems: 10
+      },
+
+      visa:    { type: 'string' },
+
       currency: {
         type: 'object',
         properties: {
-          code: { type: 'string' },                 // EGP
-          rateUsd: { type: 'number' }                  // 30.8
+          code:    { type: 'string' },
+          rateUsd: { type: 'number' }
         },
         required: ['code', 'rateUsd']
       },
+
       averages: {
         type: 'object',
         properties: {
-          hostel: { type: 'number' },
+          hostel:   { type: 'number' },
           midHotel: { type: 'number' },
-          highEnd: { type: 'number' }
+          highEnd:  { type: 'number' }
         }
       },
-      weather: { type: 'string' },               // typical temps, rain
-      culture: { type: 'string' },               // etiquette, dress
-      food: { type: 'string' },               // must-try dishes
-      tips: { type: 'string' },               // packing, scams, etc.
+
+      weather: { type: 'string' },
+
+      cultureTips: {                     // ⬅️  now 10 items
+        type: 'array',
+        description: 'Local etiquette, dress, bargaining, etc.',
+        items: { type: 'string' },
+        minItems: 10, maxItems: 15
+      },
+
+      foodList: {                        // ⬅️  rated food list
+        type: 'array',
+        description: 'Must-try dishes or restaurants with rating & source',
+        items: {
+          type: 'object',
+          properties: {
+            name:   { type: 'string' },
+            note:   { type: 'string' },  // "Koshari from Abou Tarek"
+            rating: { type: 'number' },  // 4.8
+            source: { type: 'string' }   // "Google Maps"
+          },
+          required: ['name', 'rating', 'source']
+        },
+        minItems: 10, maxItems: 20
+      },
+
+      tips: { type: 'string' },
+
       days: {
         type: 'array',
         items: {
           type: 'object',
           properties: {
-            date: { type: 'string' },                  // "2025-07-01"
-            title: { type: 'string' },                  // "Arrival & Acclimation"
-            cost: { type: 'string' },                  // "$80"
+            date:  { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+            title: { type: 'string' },
+            cost:  { type: 'string' },
             steps: {
               type: 'array',
               items: {
                 type: 'object',
                 properties: {
-                  time: { type: 'string' },             // "09:00"
-                  text: { type: 'string' },             // "Check in …"
-                  mode: { type: 'string' },             // "Taxi", "Walk"
-                  cost: { type: 'string' }              // "$15"
+                  time: { type: 'string' },  // e.g. "06:30"
+                  text: { type: 'string' },
+                  mode: { type: 'string' },
+                  cost: { type: 'string' }
                 },
                 required: ['text']
-              }
+              },
+              minItems: 8         // ⬅️  early morning → late night
             }
           },
           required: ['date', 'title', 'steps']
         }
       },
+
       totalCost: { type: 'string' }
     },
-    required: ['intro', 'visa', 'currency', 'weather', 'culture', 'food', 'tips', 'days']
+    required: [
+      'intro', 'beforeYouGo', 'visa', 'currency', 'weather',
+      'cultureTips', 'foodList', 'tips', 'days'
+    ]
   }
 };
 
@@ -69,38 +108,6 @@ export async function POST(req: Request) {
     const startDate = new Date(form.dateRange.from);
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    const prompt = `Generate a comprehensive budget itinerary for ${form.destination}
-Travel dates: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}
-Duration: ${duration} days
-Group type: ${form.groupType}
-Daily budget: $${form.dailyBudget}
-Travel vibe: ${form.travelVibe}
-Interests: ${form.interests?.join(', ') || 'General sightseeing'}
-Dietary preferences: ${form.dietary || form.foodStyle}
-Accommodation style: ${form.accommodation}
-Transportation preference: ${form.transportPref}
-Special occasion: ${form.occasion}
-Must-see spots: ${form.mustSee || 'None specified'}
-Things to avoid: ${form.avoid || 'None specified'}
-
-Create a detailed itinerary that includes:
-- Practical travel information (visa, currency, weather)
-- Accommodation price ranges for different budgets
-- Cultural etiquette and local customs
-- Must-try local dishes and food recommendations
-- Helpful travel tips and common scams to avoid
-- Day-by-day schedule with specific times, activities, transportation modes, and costs
-- Ensure daily costs align with the $${form.dailyBudget} budget
-- Include ${form.travelVibe} activities that match their interests in ${form.interests?.join(', ') || 'general sightseeing'}
-- Consider their ${form.groupType} group type and ${form.accommodation} accommodation preference
-- Account for ${form.transportPref} transportation preference
-${form.dietary && form.dietary !== 'None' ? `- Include ${form.dietary} dining options` : ''}
-${form.occasion && form.occasion !== 'None' ? `- Add special touches for their ${form.occasion} celebration` : ''}
-${form.mustSee ? `- Make sure to include: ${form.mustSee}` : ''}
-${form.avoid ? `- Avoid or minimize: ${form.avoid}` : ''}
-
-Output MUST call the function "generate_itinerary" with all required fields.`;
 
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,
@@ -113,7 +120,37 @@ Output MUST call the function "generate_itinerary" with all required fields.`;
         },
         {
           role: 'user',
-          content: prompt
+          content: `
+            Generate a detailed budget itinerary for ${form.destination}
+            • Date range: ${form.dateRange.from} to ${form.dateRange.to}
+            • Daily budget: $${form.dailyBudget}
+            • Duration: ${duration} days
+            • Group type: ${form.groupType}
+            • Travel vibe: ${form.travelVibe}
+            • Interests: ${form.interests?.join(', ') || 'General sightseeing'}
+            • Dietary preferences: ${form.dietary}
+            • Accommodation: ${form.accommodation}
+            • Transportation: ${form.transportPref}
+            • Special occasion: ${form.occasion}
+            • Must-see: ${form.mustSee || 'None'}
+            • Avoid: ${form.avoid || 'None'}
+
+            REQUIREMENTS
+            1. Call the function "generate_itinerary" with JSON that matches the schema.
+            2. "beforeYouGo": 8-10 key bullets (safety, SIM cards, cash, etc.).
+            3. "cultureTips": at least 10 concise etiquette tips.
+            4. "foodList": 10-20 items. Each must include rating (0-5) and rating source.
+            5. Each day must have 8+ steps covering early morning to late night with
+               realistic transport modes and prices checked against 2025 data.
+            6. All dates must be ISO-8601 YYYY-MM-DD format.
+            7. Consider their ${form.travelVibe} vibe and ${form.interests?.join(', ')} interests.
+            8. Match their $${form.dailyBudget} daily budget and ${form.accommodation} accommodation preference.
+            9. Account for ${form.transportPref} transportation and ${form.groupType} group type.
+            ${form.dietary && form.dietary !== 'None' ? `10. Include ${form.dietary} dining options.` : ''}
+            ${form.occasion && form.occasion !== 'None' ? `11. Add special touches for ${form.occasion}.` : ''}
+            ${form.mustSee ? `12. Include: ${form.mustSee}` : ''}
+            ${form.avoid ? `13. Avoid: ${form.avoid}` : ''}
+          `
         }
       ]
     });
@@ -131,26 +168,58 @@ Output MUST call the function "generate_itinerary" with all required fields.`;
   } catch (err) {
     appendError(err, 'groq-api');
     
-    // Fallback response with structured format
+    // Enhanced fallback response with new structure
     const form = await req.json().catch(() => ({ destination: 'Unknown', dailyBudget: 100 }));
     const fallbackData = {
-      intro: `Welcome to your ${form.destination} adventure! This sample itinerary provides a taste of what awaits you.`,
-      visa: "Check current visa requirements for your nationality before travel.",
+      intro: `Welcome to your ${form.destination} adventure! This sample itinerary provides a taste of what awaits you in this incredible destination.`,
+      beforeYouGo: [
+        "Check visa requirements for your nationality",
+        "Get travel insurance before departure",
+        "Notify your bank of travel plans",
+        "Download offline maps and translation apps",
+        "Pack appropriate clothing for the climate",
+        "Bring universal power adapters",
+        "Keep digital copies of important documents",
+        "Research local emergency numbers"
+      ],
+      visa: "Check current visa requirements for your nationality before travel. Some countries offer visa-on-arrival or e-visa options.",
       currency: { code: "USD", rateUsd: 1 },
       averages: { hostel: 25, midHotel: 75, highEnd: 200 },
-      weather: "Check current weather conditions and seasonal patterns for your travel dates.",
-      culture: "Research local customs, dress codes, and cultural etiquette before your trip.",
-      food: "Explore local cuisine and try traditional dishes at recommended restaurants.",
-      tips: "Keep copies of important documents, stay aware of your surroundings, and learn basic local phrases.",
+      weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack accordingly for temperature and precipitation.",
+      cultureTips: [
+        "Learn basic greetings in the local language",
+        "Research appropriate dress codes for religious sites",
+        "Understand local tipping customs and expectations",
+        "Be aware of cultural gestures that might be offensive",
+        "Respect photography restrictions in certain areas",
+        "Learn about local dining etiquette and meal times",
+        "Understand bargaining practices in markets",
+        "Be mindful of personal space and physical contact norms",
+        "Research local holidays that might affect opening hours",
+        "Understand appropriate behavior in public transportation"
+      ],
+      foodList: [
+        { name: "Local Street Food", note: "Try authentic street vendors", rating: 4.5, source: "TripAdvisor" },
+        { name: "Traditional Restaurant", note: "Family-run establishment", rating: 4.2, source: "Google Maps" },
+        { name: "Local Market Food", note: "Fresh ingredients and local flavors", rating: 4.0, source: "Yelp" },
+        { name: "Regional Specialty", note: "Must-try local dish", rating: 4.7, source: "Lonely Planet" },
+        { name: "Breakfast Spot", note: "Popular morning destination", rating: 4.3, source: "Google Maps" }
+      ],
+      tips: "Keep copies of important documents, stay aware of your surroundings, learn basic local phrases, and always have emergency contacts readily available.",
       days: [
         {
           date: new Date().toISOString().split('T')[0],
           title: "Arrival & Exploration",
           cost: `$${form.dailyBudget || 100}`,
           steps: [
-            { time: "09:00", text: "Arrive and check into accommodation", mode: "Taxi", cost: "$25" },
-            { time: "14:00", text: "Explore city center and main attractions", mode: "Walk", cost: "$20" },
-            { time: "19:00", text: "Dinner at local restaurant", cost: "$30" }
+            { time: "08:00", text: "Arrive at airport and complete immigration", mode: "Flight", cost: "Included" },
+            { time: "10:00", text: "Take transport to accommodation", mode: "Taxi", cost: "$25" },
+            { time: "12:00", text: "Check into accommodation and freshen up", mode: "Walk", cost: "$0" },
+            { time: "14:00", text: "Lunch at nearby local restaurant", cost: "$15" },
+            { time: "16:00", text: "Explore immediate neighborhood", mode: "Walk", cost: "$0" },
+            { time: "18:00", text: "Visit main city center or landmark", mode: "Public Transit", cost: "$5" },
+            { time: "20:00", text: "Dinner at recommended restaurant", cost: "$25" },
+            { time: "22:00", text: "Return to accommodation and rest", mode: "Public Transit", cost: "$5" }
           ]
         }
       ],

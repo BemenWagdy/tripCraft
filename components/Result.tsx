@@ -16,16 +16,16 @@ interface ResultProps {
   onBack: () => void;
 }
 
-// Helper function to parse markdown itinerary into structured data
-function parseItinerary(markdown: string, destination: string) {
+// Helper function to parse markdown itinerary into structured data for the new PDF format
+function parseItineraryForPdf(markdown: string, destination: string) {
   const lines = markdown.split('\n').map(line => line.trim()).filter(Boolean);
   
   let intro = '';
   const days: Array<{
+    date: string;
     title: string;
-    date?: string;
-    entries: string[];
-    budget?: string;
+    items: Array<{ text: string; cost?: string }>;
+    dailyTotal?: string;
   }> = [];
   
   let currentDay: any = null;
@@ -42,36 +42,60 @@ function parseItinerary(markdown: string, destination: string) {
       if (currentDay) {
         days.push(currentDay);
       }
+      
+      // Extract day title and generate date
+      const dayTitle = line.replace(/^##\s*Day\s+\d+[:\-\s]*/, '').trim();
+      const dayNumber = days.length + 1;
+      const baseDate = new Date();
+      baseDate.setDate(baseDate.getDate() + dayNumber - 1);
+      
       currentDay = {
-        title: line.replace(/^##\s*/, ''),
-        entries: [],
+        date: baseDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        title: dayTitle || 'Exploration',
+        items: [],
       };
       foundFirstDay = true;
       continue;
     }
     
-    // Budget lines
-    if (currentDay && (line.includes('Budget:') || line.includes('$'))) {
+    // Budget lines - extract daily totals
+    if (currentDay && (line.includes('Budget:') || line.includes('Total:') || line.includes('Estimated:'))) {
       const budgetMatch = line.match(/\$[\d,]+/);
       if (budgetMatch) {
-        currentDay.budget = budgetMatch[0];
+        currentDay.dailyTotal = budgetMatch[0];
       }
       continue;
     }
     
-    // Bullet points
+    // Bullet points and activities
     if (line.startsWith('- ') || line.startsWith('* ')) {
       if (currentDay) {
-        currentDay.entries.push(line.replace(/^[*-]\s*/, ''));
+        const text = line.replace(/^[*-]\s*/, '');
+        const costMatch = text.match(/\$[\d,]+/);
+        
+        currentDay.items.push({
+          text: text.replace(/\s*\$[\d,]+\s*/, ''), // Remove cost from text
+          cost: costMatch ? costMatch[0] : undefined
+        });
       }
+      continue;
+    }
+    
+    // Time-based activities (Morning:, Afternoon:, etc.)
+    if (currentDay && line.match(/^(Morning|Afternoon|Evening|Night):/i)) {
+      currentDay.items.push({
+        text: line
+      });
       continue;
     }
     
     // Regular paragraphs
     if (!foundFirstDay && line.length > 20) {
       intro += (intro ? ' ' : '') + line;
-    } else if (currentDay && line.length > 10) {
-      currentDay.entries.push(line);
+    } else if (currentDay && line.length > 10 && !line.includes('##')) {
+      currentDay.items.push({
+        text: line
+      });
     }
   }
   
@@ -82,12 +106,15 @@ function parseItinerary(markdown: string, destination: string) {
   
   // Fallback if no days were parsed
   if (days.length === 0) {
+    const fallbackItems = lines
+      .filter(line => !line.startsWith('#') && line.length > 10)
+      .slice(0, 8)
+      .map(text => ({ text }));
+      
     days.push({
-      title: 'Your Itinerary',
-      entries: lines.filter(line => 
-        !line.startsWith('#') && 
-        line.length > 10
-      ).slice(0, 10)
+      date: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+      title: 'Your Adventure',
+      items: fallbackItems
     });
   }
   
@@ -104,12 +131,11 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
     try {
       setIsGeneratingPdf(true);
       
-      // Parse the markdown itinerary
-      const parsed = parseItinerary(itinerary, destination);
+      // Parse the markdown itinerary into the new structured format
+      const parsed = parseItineraryForPdf(itinerary, destination);
       
-      // Create PDF data structure
+      // Create PDF data structure for the new component
       const pdfData = {
-        traveller: 'Solo Traveller', // Could be extracted from form data if available
         destination: destination,
         dateRange: new Date().toLocaleDateString('en-US', { 
           month: 'short', 
@@ -122,6 +148,8 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
         }),
         intro: parsed.intro,
         days: parsed.days,
+        traveller: 'Solo Traveller',
+        grandTotal: undefined // Could be calculated from daily totals if needed
       };
       
       // Dynamically import pdf function to avoid SSR issues

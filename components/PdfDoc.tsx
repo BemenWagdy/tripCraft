@@ -1,125 +1,117 @@
+/* components/PdfDoc.tsx */
 import {
   Document,
   Page,
-  Text,
   View,
+  Text,
   StyleSheet,
+  Font,
 } from '@react-pdf/renderer';
 
-// ---------- Styles ----------
-const palette = {
-  primary: '#2563eb',   // Tailwind blue-600
-  text:    '#111827',   // Tailwind gray-900
-  light:   '#6b7280',   // Tailwind gray-500
+/* ---------- theme ---------- */
+const colors = {
+  primary: '#2563eb',      // blue-600
+  text:    '#111827',      // gray-900
+  sub:     '#6b7280',      // gray-500
+  bgRow:   '#f3f4f6',      // gray-100
 };
 
-const styles = StyleSheet.create({
-  /* shared */
-  page:   { padding: 40, fontFamily: 'Helvetica', fontSize: 11, color: palette.text },
-  h1:     { fontSize: 28, fontFamily: 'Helvetica-Bold', marginBottom: 8 },
-  h2:     { fontSize: 20, fontFamily: 'Helvetica-Bold', margin: 12  },
-  h3:     { fontSize: 14, fontFamily: 'Helvetica-Bold', marginTop: 8 },
-
-  /* cover page */
-  coverWrap: { alignItems: 'center', justifyContent: 'center', flex: 1 },
-  bar:   { height: 8, width: '100%', backgroundColor: palette.primary, marginBottom: 24 },
-  subtitle: { fontSize: 14, color: palette.light, marginBottom: 4 },
-
-  /* side strip (every content page) */
-  side:  {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 32,
-    backgroundColor: palette.primary,
-  },
-  sideText: {
-    position: 'absolute',
-    bottom: 24,
-    left: -90,
-    transformOrigin: 'top left',
-    transform: 'rotate(-90deg)',
-    color: '#fff',
-    fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
-  },
-
-  /* body text */
-  p:     { marginVertical: 2, lineHeight: 1.35 },
-  bullet:{ flexDirection: 'row', marginVertical: 1 },
-  dot:   { width: 6, height: 6, borderRadius: 3, marginTop: 4, marginRight: 6, backgroundColor: palette.primary },
-  col:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+/* ---------- styles ---------- */
+const s = StyleSheet.create({
+  page:        { fontFamily: 'Helvetica', padding: 40, fontSize: 10, color: colors.text },
+  h1:          { fontSize: 28, fontFamily: 'Helvetica-Bold', marginBottom: 6 },
+  h2:          { fontSize: 18, fontFamily: 'Helvetica-Bold', marginTop: 24, marginBottom: 6 },
+  h3:          { fontSize: 14, fontFamily: 'Helvetica-Bold', marginTop: 12, marginBottom: 4 },
+  p:           { marginVertical: 2, lineHeight: 1.35 },
+  bulletRow:   { flexDirection: 'row', marginVertical: 1 },
+  bullet:      { width: 6, height: 6, borderRadius: 3, marginTop: 4, marginRight: 4, backgroundColor: colors.primary },
+  costRow:     { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.bgRow, padding: 4, marginTop: 6 },
+  costCellL:   { fontFamily: 'Helvetica-Bold' },
+  costCellR:   { fontFamily: 'Helvetica-Bold' },
+  footer:      { borderTop: 1, marginTop: 16, paddingTop: 8, fontSize: 9, color: colors.sub, textAlign: 'center' },
 });
 
-// ---------- Helpers ----------
-const Bullet = ({ children }: { children: React.ReactNode }) => (
-  <View style={styles.bullet}>
-    <View style={styles.dot} />
-    <Text style={styles.p}>{children}</Text>
+/* ---------- helper ---------- */
+const Bullet = ({ children }: { children: string }) => (
+  <View style={s.bulletRow}>
+    <View style={s.bullet} />
+    <Text style={s.p}>{children}</Text>
   </View>
 );
 
-// ---------- Main component ----------
-interface ItineraryDay {
-  title: string;                     // "Day 1: Giza Pyramids"
-  date?: string;                     // "Tue 30 Jun"
-  entries: string[];                 // lines / bullets
-  budget?: string;                   // optional total
+/* ---------- types ---------- */
+interface DayEntry {
+  text:   string;   // "Visit the Egyptian Museum …"
+  cost?:  string;   // "$10"
 }
-
+interface Day {
+  date:   string;   // "Mon 30 Jun"
+  title:  string;   // "Arrival & Acclimation"
+  items:  DayEntry[];
+  dailyTotal?: string; // "$80"
+}
 interface PdfProps {
-  traveller: string;                 // e.g. "Ali Hassan"
-  destination: string;               // e.g. "Cairo, Egypt"
-  dateRange: string;                 // e.g. "30 Jun – 14 Jul 2025"
-  intro: string;                     // paragraph intro
-  days: ItineraryDay[];              // parsed itinerary
+  destination: string;          // "Cairo, Egypt"
+  dateRange:   string;          // "30 Jun – 14 Jul 2025"
+  intro:       string;
+  days:        Day[];
+  traveller:   string;          // "Solo Traveller"
+  grandTotal?: string;          // optional whole-trip figure
 }
 
-export default function PdfDoc(props: PdfProps) {
-  const { traveller, destination, dateRange, intro, days } = props;
-
+export default function PdfDoc({
+  destination,
+  dateRange,
+  intro,
+  days,
+  traveller,
+  grandTotal,
+}: PdfProps) {
   return (
     <Document title={`TripCraft – ${destination} itinerary`}>
-      {/* COVER */}
-      <Page size="A4" style={{ ...styles.page, padding: 0 }}>
-        <View style={styles.bar} />
-        <View style={styles.coverWrap}>
-          <Text style={styles.h1}>{destination}</Text>
-          <Text style={styles.subtitle}>{dateRange}</Text>
-          <Text style={{ ...styles.subtitle, marginTop: 20 }}>
-            Personalised for {traveller}
-          </Text>
-        </View>
+      <Page size="A4" style={s.page} wrap>
+        {/* --- cover / header --- */}
+        <Text style={s.h1}>{destination}</Text>
+        <Text style={{ ...s.p, color: colors.sub }}>{dateRange}</Text>
+        <Text style={{ ...s.p, marginTop: 12 }}>{intro}</Text>
+
+        {/* --- day blocks --- */}
+        {days.map((d, idx) => (
+          <View key={idx} wrap={false}>
+            <Text style={s.h2}>
+              Day {idx + 1} · {d.title} ({d.date})
+            </Text>
+
+            {d.items.map((it, i) => (
+              <Bullet key={i}>{it.text}{it.cost ? `  –  ${it.cost}` : ''}</Bullet>
+            ))}
+
+            {d.dailyTotal && (
+              <View style={s.costRow}>
+                <Text style={s.costCellL}>Estimated total</Text>
+                <Text style={s.costCellR}>{d.dailyTotal}</Text>
+              </View>
+            )}
+          </View>
+        ))}
+
+        {/* --- summary --- */}
+        {grandTotal && (
+          <View style={s.costRow}>
+            <Text style={s.costCellL}>Trip estimate</Text>
+            <Text style={s.costCellR}>{grandTotal}</Text>
+          </View>
+        )}
+
+        {/* --- footer (auto on last page) --- */}
+        <Text
+          style={s.footer}
+          render={({ pageNumber, totalPages }) =>
+            `Generated by TripCraft for ${traveller}  ·  Page ${pageNumber}/${totalPages}`
+          }
+          fixed
+        />
       </Page>
-
-      {/* CONTENT PAGES */}
-      {days.map((d, i) => (
-        <Page size="A4" key={i} style={styles.page}>
-          {/* side strip */}
-          <View style={styles.side} />
-          <Text style={styles.sideText}>
-            {traveller} · p.{i + 2}
-          </Text>
-
-          <Text style={styles.h2}>{d.title}</Text>
-          {d.date && <Text style={{ ...styles.p, color: palette.light }}>{d.date}</Text>}
-          {i === 0 && (
-            <Text style={{ ...styles.p, marginVertical: 8 }}>{intro}</Text>
-          )}
-
-          {d.entries.map((line, idx) => (
-            <Bullet key={idx}>{line}</Bullet>
-          ))}
-
-          {d.budget && (
-            <View style={styles.col}>
-              <Text style={styles.h3}>Daily budget</Text>
-              <Text style={styles.h3}>{d.budget}</Text>
-            </View>
-          )}
-        </Page>
-      ))}
     </Document>
   );
 }

@@ -1,77 +1,118 @@
 'use client';
 
-import React, { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+
+import {
+  Form, FormField, FormItem, FormLabel, FormMessage,
+  FormControl, FormDescription,
+} from '@/components/FormPrimitives';
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
-import { Plane, MapPin, Utensils, Wallet, Heart, Loader2 } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plane, MapPin, Calendar as CalendarIcon, Users, DollarSign, Heart, Utensils, Home, Car, Gift, Eye, AlertTriangle } from 'lucide-react';
+import DestinationField from './DestinationField';
+
+import clsx from 'clsx';
+import { useState } from 'react';
+import { DateRange } from 'react-day-picker';
 import Result from './Result';
 import { appendError } from '@/lib/logger';
 
-interface FormData {
-  destination: string;
-  foodStyle: string;
-  travelStyle: string;
-  interests: string[];
-  dailyBudget: number;
-  duration: number;
-}
+/*───────────────────────────────────────────────
+  1.  Zod schema
+───────────────────────────────────────────────*/
+export const questionnaireSchema = z.object({
+  destination: z.string().min(2, 'Pick a city'),
+  dateRange: z.object({ 
+    from: z.date(), 
+    to: z.date() 
+  }).refine(data => data.to > data.from, {
+    message: "End date must be after start date"
+  }),
+  groupType: z.enum(['Solo','Couple','Family','Friends','Business','Seniors']),
+  budgetPerDay: z.number().min(25).max(1000),
+  travelVibe: z.enum(['Relaxation','Balanced','Adventure']),
+  interests: z.array(z.string()).min(1, 'Select at least one interest'),
+  dietary: z.enum(['None','Halal','Vegetarian','Vegan','Gluten-Free','Kosher']),
+  accommodation: z.enum(['Hostel','Budget','Boutique','Luxury','Resort','Apartment']),
+  transportPref: z.enum(['Public Transit','Rental Car','Private Driver','Walk/Bike']),
+  occasion: z.enum(['None','Honeymoon','Anniversary','Birthday','Graduation']),
+  mustSee: z.string().optional(),
+  avoid: z.string().optional(),
+});
 
-const Questionnaire: React.FC = () => {
-  const [formData, setFormData] = useState<FormData>({
-    destination: '',
-    foodStyle: 'street',
-    travelStyle: 'mid',
-    interests: [],
-    dailyBudget: 150,
-    duration: 5
-  });
-  
+export type QuestionnaireValues = z.infer<typeof questionnaireSchema>;
+
+/* small helper for chip-buttons */
+const chipClass = (selected: boolean) =>
+  clsx(
+    'rounded-lg border px-4 py-2 text-sm transition cursor-pointer',
+    selected ? 'bg-blue-500 text-white border-blue-500' : 'bg-white hover:bg-blue-50 border-gray-200'
+  );
+
+/*───────────────────────────────────────────────
+  2.  Component
+───────────────────────────────────────────────*/
+export default function Questionnaire() {
   const [isLoading, setIsLoading] = useState(false);
   const [itinerary, setItinerary] = useState<string | null>(null);
 
-  const interestOptions = [
-    'History & Culture',
-    'Adventure Sports',
-    'Nature & Wildlife',
-    'Art & Museums',
-    'Nightlife',
-    'Shopping',
-    'Photography',
-    'Local Experiences',
-    'Beaches',
-    'Architecture'
-  ];
+  const methods = useForm<QuestionnaireValues>({
+    resolver: zodResolver(questionnaireSchema),
+    defaultValues: {
+      destination: '',
+      dateRange: { 
+        from: new Date(), 
+        to: new Date(Date.now() + 7 * 86_400_000) // 7 days from now
+      },
+      groupType: 'Solo',
+      budgetPerDay: 100,
+      travelVibe: 'Balanced',
+      interests: ['Culture'],
+      dietary: 'None',
+      accommodation: 'Boutique',
+      transportPref: 'Public Transit',
+      occasion: 'None',
+      mustSee: '',
+      avoid: '',
+    },
+  });
 
-  const handleInterestChange = (interest: string, checked: boolean) => {
-    if (checked) {
-      setFormData(prev => ({
-        ...prev,
-        interests: [...prev.interests, interest]
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        interests: prev.interests.filter(i => i !== interest)
-      }));
-    }
-  };
+  const [range, setRange] = useState<DateRange>({
+    from: methods.getValues('dateRange').from,
+    to: methods.getValues('dateRange').to,
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.destination.trim()) {
-      alert('Please enter a destination');
-      return;
-    }
-
+  const onSubmit = async (values: QuestionnaireValues) => {
     setIsLoading(true);
     
     try {
+      // Calculate duration
+      const duration = Math.ceil((values.dateRange.to.getTime() - values.dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Transform data for the API
+      const formData = {
+        destination: values.destination,
+        foodStyle: values.dietary.toLowerCase(),
+        travelStyle: values.travelVibe.toLowerCase(),
+        interests: values.interests,
+        dailyBudget: values.budgetPerDay,
+        duration: duration,
+        groupType: values.groupType,
+        accommodation: values.accommodation,
+        transportPref: values.transportPref,
+        occasion: values.occasion,
+        mustSee: values.mustSee,
+        avoid: values.avoid,
+        dateRange: values.dateRange,
+      };
+
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: {
@@ -88,7 +129,7 @@ const Questionnaire: React.FC = () => {
 
 We encountered an issue generating your itinerary. Please try again later.
 
-## Sample Itinerary for ${formData.destination}
+## Sample Itinerary for ${values.destination}
 
 ### Day 1: Arrival
 - Check into accommodation
@@ -116,11 +157,11 @@ We encountered an issue generating your itinerary. Please try again later.
   };
 
   if (itinerary) {
-    return <Result itinerary={itinerary} destination={formData.destination} onBack={handleBack} />;
+    return <Result itinerary={itinerary} destination={methods.getValues('destination')} onBack={handleBack} />;
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       <Card className="shadow-xl">
         <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
           <CardTitle className="text-3xl font-bold text-center flex items-center justify-center gap-3">
@@ -132,150 +173,361 @@ We encountered an issue generating your itinerary. Please try again later.
           </p>
         </CardHeader>
         <CardContent className="p-8">
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Destination */}
-            <div className="space-y-3">
-              <Label htmlFor="destination" className="text-lg font-medium flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" />
-                Where would you like to go?
-              </Label>
-              <Input
-                id="destination"
-                value={formData.destination}
-                onChange={(e) => setFormData(prev => ({ ...prev, destination: e.target.value }))}
-                placeholder="e.g., Tokyo, Japan"
-                className="text-lg p-4"
-                required
+          <Form {...methods}>
+            <form onSubmit={methods.handleSubmit(onSubmit)} className="space-y-8">
+              
+              {/* Destination */}
+              <FormField
+                control={methods.control}
+                name="destination"
+                render={() => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-blue-500" />
+                      Destination city
+                    </FormLabel>
+                    <FormControl>
+                      <DestinationField />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            {/* Duration */}
-            <div className="space-y-3">
-              <Label className="text-lg font-medium">Trip Duration: {formData.duration} days</Label>
-              <Slider
-                value={[formData.duration]}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, duration: value[0] }))}
-                max={14}
-                min={2}
-                step={1}
-                className="w-full"
+              {/* Date range */}
+              <FormField
+                control={methods.control}
+                name="dateRange"
+                render={() => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <CalendarIcon className="h-5 w-5 text-blue-500" />
+                      Travel dates
+                    </FormLabel>
+                    <FormControl>
+                      <Calendar
+                        mode="range"
+                        numberOfMonths={2}
+                        selected={range}
+                        onSelect={(r) => {
+                          if (r?.from && r?.to) {
+                            setRange(r);
+                            methods.setValue('dateRange', { from: r.from, to: r.to }, { shouldValidate: true });
+                          }
+                        }}
+                        className="rounded-md border bg-white"
+                        disabled={(date) => date < new Date()}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>2 days</span>
-                <span>14 days</span>
-              </div>
-            </div>
 
-            {/* Food Style */}
-            <div className="space-y-4">
-              <Label className="text-lg font-medium flex items-center gap-2">
-                <Utensils className="h-5 w-5 text-primary" />
-                Food Preferences
-              </Label>
-              <RadioGroup
-                value={formData.foodStyle}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, foodStyle: value }))}
-                className="grid grid-cols-1 md:grid-cols-3 gap-4"
+              {/* Group type */}
+              <FormField
+                control={methods.control}
+                name="groupType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <Users className="h-5 w-5 text-blue-500" />
+                      Travelling as
+                    </FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex flex-wrap gap-3"
+                      >
+                        {['Solo','Couple','Family','Friends','Business','Seniors'].map((opt) => (
+                          <div key={opt} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
+                            <RadioGroupItem value={opt} id={opt} />
+                            <FormLabel htmlFor={opt} className="cursor-pointer font-normal">
+                              {opt}
+                            </FormLabel>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Budget slider */}
+              <FormField
+                control={methods.control}
+                name="budgetPerDay"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-blue-500" />
+                      Daily budget (USD)
+                    </FormLabel>
+                    <FormControl>
+                      <Slider
+                        min={25} max={1000} step={25}
+                        value={[field.value]}
+                        onValueChange={(v) => field.onChange(v[0])}
+                        className="w-full"
+                      />
+                    </FormControl>
+                    <FormDescription className="text-right font-medium text-lg">
+                      ${field.value}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Travel vibe */}
+              <FormField
+                control={methods.control}
+                name="travelVibe"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <Heart className="h-5 w-5 text-blue-500" />
+                      Trip vibe
+                    </FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex gap-3"
+                      >
+                        {['Relaxation','Balanced','Adventure'].map((opt) => (
+                          <div key={opt} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
+                            <RadioGroupItem value={opt} id={`vibe-${opt}`} />
+                            <FormLabel htmlFor={`vibe-${opt}`} className="cursor-pointer font-normal">
+                              {opt}
+                            </FormLabel>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Interests chips */}
+              <FormField
+                control={methods.control}
+                name="interests"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium">Main interests</FormLabel>
+                    <FormControl>
+                      <div className="flex flex-wrap gap-2">
+                        {['Culture','Nature','Beaches','Nightlife','Foodie','Shopping','Wellness','Photography','Festivals','Sports'].map((opt) => {
+                          const selected = field.value.includes(opt);
+                          return (
+                            <button
+                              type="button"
+                              key={opt}
+                              onClick={() =>
+                                field.onChange(
+                                  selected
+                                    ? field.value.filter((v) => v !== opt)
+                                    : [...field.value, opt]
+                                )
+                              }
+                              className={chipClass(selected)}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Dietary */}
+              <FormField
+                control={methods.control}
+                name="dietary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <Utensils className="h-5 w-5 text-blue-500" />
+                      Dietary preference
+                    </FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex flex-wrap gap-3"
+                      >
+                        {['None','Halal','Vegetarian','Vegan','Gluten-Free','Kosher'].map((opt) => (
+                          <div key={opt} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
+                            <RadioGroupItem value={opt} id={`dietary-${opt}`} />
+                            <FormLabel htmlFor={`dietary-${opt}`} className="cursor-pointer font-normal">
+                              {opt}
+                            </FormLabel>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Accommodation */}
+              <FormField
+                control={methods.control}
+                name="accommodation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <Home className="h-5 w-5 text-blue-500" />
+                      Preferred stay
+                    </FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex flex-wrap gap-3"
+                      >
+                        {['Hostel','Budget','Boutique','Luxury','Resort','Apartment'].map((opt) => (
+                          <div key={opt} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
+                            <RadioGroupItem value={opt} id={`accommodation-${opt}`} />
+                            <FormLabel htmlFor={`accommodation-${opt}`} className="cursor-pointer font-normal">
+                              {opt}
+                            </FormLabel>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Transport */}
+              <FormField
+                control={methods.control}
+                name="transportPref"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <Car className="h-5 w-5 text-blue-500" />
+                      Getting around
+                    </FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex flex-col gap-2"
+                      >
+                        {['Public Transit','Rental Car','Private Driver','Walk/Bike'].map((opt) => (
+                          <div key={opt} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
+                            <RadioGroupItem value={opt} id={`transport-${opt}`} />
+                            <FormLabel htmlFor={`transport-${opt}`} className="cursor-pointer font-normal">
+                              {opt}
+                            </FormLabel>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Occasion */}
+              <FormField
+                control={methods.control}
+                name="occasion"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <Gift className="h-5 w-5 text-blue-500" />
+                      Special occasion?
+                    </FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="flex flex-wrap gap-3"
+                      >
+                        {['None','Honeymoon','Anniversary','Birthday','Graduation'].map((opt) => (
+                          <div key={opt} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
+                            <RadioGroupItem value={opt} id={`occasion-${opt}`} />
+                            <FormLabel htmlFor={`occasion-${opt}`} className="cursor-pointer font-normal">
+                              {opt}
+                            </FormLabel>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Must-see / Avoid */}
+              <FormField
+                control={methods.control}
+                name="mustSee"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <Eye className="h-5 w-5 text-blue-500" />
+                      Must-see spots (optional)
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        rows={3} 
+                        placeholder="e.g. Pyramids, jazz bar, local markets" 
+                        {...field} 
+                        className="resize-none"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={methods.control}
+                name="avoid"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-blue-500" />
+                      Things to avoid (optional)
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        rows={3} 
+                        placeholder="e.g. long hikes, spicy food, crowded places" 
+                        {...field} 
+                        className="resize-none"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Submit */}
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold py-4 text-lg"
               >
-                <div className="flex items-center space-x-2 border rounded-lg p-4 hover:bg-gray-50">
-                  <RadioGroupItem value="halal" id="halal" />
-                  <Label htmlFor="halal" className="cursor-pointer">Halal Options</Label>
-                </div>
-                <div className="flex items-center space-x-2 border rounded-lg p-4 hover:bg-gray-50">
-                  <RadioGroupItem value="street" id="street" />
-                  <Label htmlFor="street" className="cursor-pointer">Street Food</Label>
-                </div>
-                <div className="flex items-center space-x-2 border rounded-lg p-4 hover:bg-gray-50">
-                  <RadioGroupItem value="fine" id="fine" />
-                  <Label htmlFor="fine" className="cursor-pointer">Fine Dining</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {/* Travel Style */}
-            <div className="space-y-4">
-              <Label className="text-lg font-medium flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-primary" />
-                Travel Style
-              </Label>
-              <RadioGroup
-                value={formData.travelStyle}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, travelStyle: value }))}
-                className="grid grid-cols-1 md:grid-cols-3 gap-4"
-              >
-                <div className="flex items-center space-x-2 border rounded-lg p-4 hover:bg-gray-50">
-                  <RadioGroupItem value="budget" id="budget" />
-                  <Label htmlFor="budget" className="cursor-pointer">Budget Explorer</Label>
-                </div>
-                <div className="flex items-center space-x-2 border rounded-lg p-4 hover:bg-gray-50">
-                  <RadioGroupItem value="mid" id="mid" />
-                  <Label htmlFor="mid" className="cursor-pointer">Comfortable</Label>
-                </div>
-                <div className="flex items-center space-x-2 border rounded-lg p-4 hover:bg-gray-50">
-                  <RadioGroupItem value="luxury" id="luxury" />
-                  <Label htmlFor="luxury" className="cursor-pointer">Luxury</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {/* Daily Budget */}
-            <div className="space-y-3">
-              <Label className="text-lg font-medium">Daily Budget: ${formData.dailyBudget}</Label>
-              <Slider
-                value={[formData.dailyBudget]}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, dailyBudget: value[0] }))}
-                max={400}
-                min={50}
-                step={25}
-                className="w-full"
-              />
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>$50</span>
-                <span>$400</span>
-              </div>
-            </div>
-
-            {/* Interests */}
-            <div className="space-y-4">
-              <Label className="text-lg font-medium flex items-center gap-2">
-                <Heart className="h-5 w-5 text-primary" />
-                What interests you?
-              </Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {interestOptions.map((interest) => (
-                  <div key={interest} className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-gray-50">
-                    <Checkbox
-                      id={interest}
-                      checked={formData.interests.includes(interest)}
-                      onCheckedChange={(checked) => handleInterestChange(interest, !!checked)}
-                    />
-                    <Label htmlFor={interest} className="text-sm cursor-pointer">
-                      {interest}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Button 
-              type="submit" 
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold py-4 text-lg"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Crafting Your Adventure...
-                </>
-              ) : (
-                'Generate My Itinerary'
-              )}
-            </Button>
-          </form>
+                {isLoading ? 'Crafting Your Adventure...' : 'Generate My Itinerary'}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
   );
-};
-
-export default Questionnaire;
+}

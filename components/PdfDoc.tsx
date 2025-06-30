@@ -1,116 +1,125 @@
 /* components/PdfDoc.tsx */
 import {
-  Document,
-  Page,
-  View,
-  Text,
-  StyleSheet,
-  Font,
+  Document, Page, View, Text, StyleSheet
 } from '@react-pdf/renderer';
 
-/* ---------- theme ---------- */
-const colors = {
-  primary: '#2563eb',      // blue-600
-  text:    '#111827',      // gray-900
-  sub:     '#6b7280',      // gray-500
-  bgRow:   '#f3f4f6',      // gray-100
-};
+const c = { blue: '#2563eb', gray: '#6b7280', dark: '#111827' };
 
-/* ---------- styles ---------- */
-const s = StyleSheet.create({
-  page:        { fontFamily: 'Helvetica', padding: 40, fontSize: 10, color: colors.text },
-  h1:          { fontSize: 28, fontFamily: 'Helvetica-Bold', marginBottom: 6 },
-  h2:          { fontSize: 18, fontFamily: 'Helvetica-Bold', marginTop: 24, marginBottom: 6 },
-  h3:          { fontSize: 14, fontFamily: 'Helvetica-Bold', marginTop: 12, marginBottom: 4 },
-  p:           { marginVertical: 2, lineHeight: 1.35 },
-  bulletRow:   { flexDirection: 'row', marginVertical: 1 },
-  bullet:      { width: 6, height: 6, borderRadius: 3, marginTop: 4, marginRight: 4, backgroundColor: colors.primary },
-  costRow:     { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.bgRow, padding: 4, marginTop: 6 },
-  costCellL:   { fontFamily: 'Helvetica-Bold' },
-  costCellR:   { fontFamily: 'Helvetica-Bold' },
-  footer:      { borderTop: 1, marginTop: 16, paddingTop: 8, fontSize: 9, color: colors.sub, textAlign: 'center' },
+const st = StyleSheet.create({
+  page: { fontFamily: 'Helvetica', fontSize: 10, padding: 40, color: c.dark },
+  h1:   { fontSize: 26, fontFamily: 'Helvetica-Bold', marginBottom: 4 },
+  h2:   { fontSize: 16, fontFamily: 'Helvetica-Bold', marginTop: 16, marginBottom: 4 },
+  p:    { marginVertical: 2, lineHeight: 1.35 },
+  bullet:{ flexDirection: 'row', marginVertical: 1 },
+  dot:  { width: 5, height: 5, borderRadius: 2.5, marginTop: 4, marginRight: 4, backgroundColor: c.blue },
+  tblHd:{ flexDirection: 'row', backgroundColor: c.blue, color: '#fff', padding: 4, fontFamily: 'Helvetica-Bold' },
+  tblRow:{ flexDirection: 'row', borderBottom: 1, borderColor: '#eee', paddingVertical: 2 },
+  cellL:{ width: '60%' }, 
+  cellR:{ width: '40%', textAlign: 'right' },
 });
 
-/* ---------- helper ---------- */
-const Bullet = ({ children }: { children: string }) => (
-  <View style={s.bulletRow}>
-    <View style={s.bullet} />
-    <Text style={s.p}>{children}</Text>
-  </View>
+const Bullet = ({ children }: { children: React.ReactNode }) => (
+  <View style={st.bullet}><View style={st.dot} /><Text style={st.p}>{children}</Text></View>
 );
 
-/* ---------- types ---------- */
-interface DayEntry {
-  text:   string;   // "Visit the Egyptian Museum …"
-  cost?:  string;   // "$10"
-}
-interface Day {
-  date:   string;   // "Mon 30 Jun"
-  title:  string;   // "Arrival & Acclimation"
-  items:  DayEntry[];
-  dailyTotal?: string; // "$80"
-}
-interface PdfProps {
-  destination: string;          // "Cairo, Egypt"
-  dateRange:   string;          // "30 Jun – 14 Jul 2025"
-  intro:       string;
-  days:        Day[];
-  traveller:   string;          // "Solo Traveller"
-  grandTotal?: string;          // optional whole-trip figure
+interface StructuredData {
+  destination: string;
+  dateRange: string;
+  intro: string;
+  visa: string;
+  currency: { code: string; rateUsd: number };
+  averages: { hostel: number; midHotel: number; highEnd: number };
+  weather: string;
+  culture: string;
+  food: string;
+  tips: string;
+  days: Array<{
+    date: string;
+    title: string;
+    cost?: string;
+    steps: Array<{
+      time?: string;
+      text: string;
+      mode?: string;
+      cost?: string;
+    }>;
+  }>;
+  totalCost?: string;
 }
 
-export default function PdfDoc({
-  destination,
-  dateRange,
-  intro,
-  days,
-  traveller,
-  grandTotal,
-}: PdfProps) {
+export default function PdfDoc({ data }: { data: StructuredData }) {
+  const {
+    destination, dateRange, intro, visa, currency,
+    averages, weather, culture, food, tips, days, totalCost
+  } = data;
+
   return (
-    <Document title={`TripCraft – ${destination} itinerary`}>
-      <Page size="A4" style={s.page} wrap>
-        {/* --- cover / header --- */}
-        <Text style={s.h1}>{destination}</Text>
-        <Text style={{ ...s.p, color: colors.sub }}>{dateRange}</Text>
-        <Text style={{ ...s.p, marginTop: 12 }}>{intro}</Text>
+    <Document>
+      <Page size="A4" style={st.page} wrap>
 
-        {/* --- day blocks --- */}
-        {days.map((d, idx) => (
-          <View key={idx} wrap={false}>
-            <Text style={s.h2}>
-              Day {idx + 1} · {d.title} ({d.date})
-            </Text>
+        {/* Header */}
+        <Text style={st.h1}>{destination}</Text>
+        <Text style={{ ...st.p, color: c.gray }}>{dateRange}</Text>
+        <Text style={{ ...st.p, marginTop: 8 }}>{intro}</Text>
 
-            {d.items.map((it, i) => (
-              <Bullet key={i}>{it.text}{it.cost ? `  –  ${it.cost}` : ''}</Bullet>
+        {/* Practical blocks */}
+        <Text style={st.h2}>Before you go</Text>
+        <Bullet>{visa}</Bullet>
+        <Bullet>Currency: 1 {currency.code} ≈ ${currency.rateUsd.toFixed(2)} USD</Bullet>
+        <Bullet>{weather}</Bullet>
+
+        <Text style={st.h2}>Average accommodation</Text>
+        <View style={st.tblHd}>
+          <Text style={st.cellL}>Type</Text>
+          <Text style={st.cellR}>Price / night</Text>
+        </View>
+        <View style={st.tblRow}>
+          <Text style={st.cellL}>Hostel</Text>
+          <Text style={st.cellR}>${averages.hostel}</Text>
+        </View>
+        <View style={st.tblRow}>
+          <Text style={st.cellL}>Mid-range hotel</Text>
+          <Text style={st.cellR}>${averages.midHotel}</Text>
+        </View>
+        <View style={st.tblRow}>
+          <Text style={st.cellL}>High-end hotel</Text>
+          <Text style={st.cellR}>${averages.highEnd}</Text>
+        </View>
+
+        <Text style={st.h2}>Local culture & food</Text>
+        <Bullet>{culture}</Bullet>
+        <Bullet>{food}</Bullet>
+        
+        <Text style={st.h2}>Tips & tricks</Text>
+        <Bullet>{tips}</Bullet>
+
+        {/* Day-by-day */}
+        {days.map((d, i) => (
+          <View key={i} wrap>
+            <Text style={st.h2}>Day {i + 1} – {d.title} ({d.date})</Text>
+            {d.steps.map((s, idx) => (
+              <Bullet key={idx}>
+                {s.time && `${s.time} – `}{s.text}
+                {s.mode && ` (${s.mode})`}
+                {s.cost && ` · ${s.cost}`}
+              </Bullet>
             ))}
-
-            {d.dailyTotal && (
-              <View style={s.costRow}>
-                <Text style={s.costCellL}>Estimated total</Text>
-                <Text style={s.costCellR}>{d.dailyTotal}</Text>
+            {d.cost && (
+              <View style={{ ...st.tblRow, backgroundColor: '#f9fafb' }}>
+                <Text style={{ ...st.cellL, fontFamily: 'Helvetica-Bold' }}>Estimated day total</Text>
+                <Text style={{ ...st.cellR, fontFamily: 'Helvetica-Bold' }}>{d.cost}</Text>
               </View>
             )}
           </View>
         ))}
 
-        {/* --- summary --- */}
-        {grandTotal && (
-          <View style={s.costRow}>
-            <Text style={s.costCellL}>Trip estimate</Text>
-            <Text style={s.costCellR}>{grandTotal}</Text>
-          </View>
+        {/* Summary */}
+        {totalCost && (
+          <>
+            <Text style={st.h2}>Grand total</Text>
+            <Text style={{ ...st.p, fontFamily: 'Helvetica-Bold' }}>{totalCost}</Text>
+          </>
         )}
-
-        {/* --- footer (auto on last page) --- */}
-        <Text
-          style={s.footer}
-          render={({ pageNumber, totalPages }) =>
-            `Generated by TripCraft for ${traveller}  ·  Page ${pageNumber}/${totalPages}`
-          }
-          fixed
-        />
       </Page>
     </Document>
   );

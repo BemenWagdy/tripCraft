@@ -16,126 +16,16 @@ interface ResultProps {
   onBack: () => void;
 }
 
-// Helper function to parse markdown itinerary into structured data for the new PDF format
-function parseItineraryForPdf(markdown: string, destination: string) {
-  const lines = markdown.split('\n').map(line => line.trim()).filter(Boolean);
-  
-  let intro = '';
-  const days: Array<{
-    date: string;
-    title: string;
-    items: Array<{ text: string; cost?: string }>;
-    dailyTotal?: string;
-  }> = [];
-  
-  let currentDay: any = null;
-  let foundFirstDay = false;
-  
-  for (const line of lines) {
-    // Skip the main title
-    if (line.startsWith('# ')) {
-      continue;
-    }
-    
-    // Day headers (## Day 1: ... or ## Day 1 - ...)
-    if (line.match(/^##\s*Day\s+\d+/i)) {
-      if (currentDay) {
-        days.push(currentDay);
-      }
-      
-      // Extract day title and generate date
-      const dayTitle = line.replace(/^##\s*Day\s+\d+[:\-\s]*/, '').trim();
-      const dayNumber = days.length + 1;
-      const baseDate = new Date();
-      baseDate.setDate(baseDate.getDate() + dayNumber - 1);
-      
-      currentDay = {
-        date: baseDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-        title: dayTitle || 'Exploration',
-        items: [],
-      };
-      foundFirstDay = true;
-      continue;
-    }
-    
-    // Budget lines - extract daily totals
-    if (currentDay && (line.includes('Budget:') || line.includes('Total:') || line.includes('Estimated:'))) {
-      const budgetMatch = line.match(/\$[\d,]+/);
-      if (budgetMatch) {
-        currentDay.dailyTotal = budgetMatch[0];
-      }
-      continue;
-    }
-    
-    // Bullet points and activities
-    if (line.startsWith('- ') || line.startsWith('* ')) {
-      if (currentDay) {
-        const text = line.replace(/^[*-]\s*/, '');
-        const costMatch = text.match(/\$[\d,]+/);
-        
-        currentDay.items.push({
-          text: text.replace(/\s*\$[\d,]+\s*/, ''), // Remove cost from text
-          cost: costMatch ? costMatch[0] : undefined
-        });
-      }
-      continue;
-    }
-    
-    // Time-based activities (Morning:, Afternoon:, etc.)
-    if (currentDay && line.match(/^(Morning|Afternoon|Evening|Night):/i)) {
-      currentDay.items.push({
-        text: line
-      });
-      continue;
-    }
-    
-    // Regular paragraphs
-    if (!foundFirstDay && line.length > 20) {
-      intro += (intro ? ' ' : '') + line;
-    } else if (currentDay && line.length > 10 && !line.includes('##')) {
-      currentDay.items.push({
-        text: line
-      });
-    }
-  }
-  
-  // Add the last day
-  if (currentDay) {
-    days.push(currentDay);
-  }
-  
-  // Fallback if no days were parsed
-  if (days.length === 0) {
-    const fallbackItems = lines
-      .filter(line => !line.startsWith('#') && line.length > 10)
-      .slice(0, 8)
-      .map(text => ({ text }));
-      
-    days.push({
-      date: new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-      title: 'Your Adventure',
-      items: fallbackItems
-    });
-  }
-  
-  return {
-    intro: intro || `Welcome to your personalized ${destination} adventure! This itinerary has been crafted specifically for your preferences and travel style.`,
-    days
-  };
-}
-
 const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = React.useState(false);
+  const [structuredData, setStructuredData] = React.useState<any>(null);
 
-  const handleExportPdf = async () => {
+  // Parse the JSON response when component mounts
+  React.useEffect(() => {
     try {
-      setIsGeneratingPdf(true);
-      
-      // Parse the markdown itinerary into the new structured format
-      const parsed = parseItineraryForPdf(itinerary, destination);
-      
-      // Create PDF data structure for the new component
-      const pdfData = {
+      const parsed = JSON.parse(itinerary);
+      setStructuredData({
+        ...parsed,
         destination: destination,
         dateRange: new Date().toLocaleDateString('en-US', { 
           month: 'short', 
@@ -145,18 +35,28 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
           month: 'short', 
           day: 'numeric',
           year: 'numeric'
-        }),
-        intro: parsed.intro,
-        days: parsed.days,
-        traveller: 'Solo Traveller',
-        grandTotal: undefined // Could be calculated from daily totals if needed
-      };
+        })
+      });
+    } catch (err) {
+      console.error('Failed to parse structured data:', err);
+      // Fallback to treating as markdown
+      setStructuredData(null);
+    }
+  }, [itinerary, destination]);
+
+  const handleExportPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      
+      if (!structuredData) {
+        throw new Error('No structured data available for PDF generation');
+      }
       
       // Dynamically import pdf function to avoid SSR issues
       const { pdf } = await import('@react-pdf/renderer');
       const { default: PdfDocComponent } = await import('./PdfDoc');
       
-      const doc = React.createElement(PdfDocComponent, pdfData);
+      const doc = React.createElement(PdfDocComponent, { data: structuredData });
       const asPdf = pdf(doc);
       const blob = await asPdf.toBlob();
       
@@ -176,7 +76,141 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
     }
   };
 
-  // Convert markdown to JSX for display
+  // Render structured data as HTML
+  const renderStructuredContent = (data: any) => {
+    if (!data) return null;
+
+    return (
+      <div className="space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-primary mb-2 flex items-center gap-2">
+            <MapPin className="h-8 w-8" />
+            {data.destination}
+          </h1>
+          <p className="text-gray-600 mb-4">{data.dateRange}</p>
+          <p className="text-gray-700 leading-relaxed">{data.intro}</p>
+        </div>
+
+        {/* Before You Go */}
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2">
+            Before You Go
+          </h2>
+          <ul className="space-y-2">
+            <li className="flex items-start gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+              <span className="text-gray-700">{data.visa}</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+              <span className="text-gray-700">Currency: 1 {data.currency.code} ≈ ${data.currency.rateUsd.toFixed(2)} USD</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+              <span className="text-gray-700">{data.weather}</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Accommodation */}
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+            Average Accommodation
+          </h2>
+          <div className="bg-gray-50 rounded-lg overflow-hidden">
+            <div className="bg-blue-500 text-white p-3 flex justify-between font-semibold">
+              <span>Type</span>
+              <span>Price / night</span>
+            </div>
+            <div className="divide-y divide-gray-200">
+              <div className="p-3 flex justify-between">
+                <span>Hostel</span>
+                <span className="font-medium">${data.averages.hostel}</span>
+              </div>
+              <div className="p-3 flex justify-between">
+                <span>Mid-range hotel</span>
+                <span className="font-medium">${data.averages.midHotel}</span>
+              </div>
+              <div className="p-3 flex justify-between">
+                <span>High-end hotel</span>
+                <span className="font-medium">${data.averages.highEnd}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Culture & Food */}
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+            Local Culture & Food
+          </h2>
+          <ul className="space-y-2">
+            <li className="flex items-start gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+              <span className="text-gray-700">{data.culture}</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+              <span className="text-gray-700">{data.food}</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Tips */}
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+            Tips & Tricks
+          </h2>
+          <ul className="space-y-2">
+            <li className="flex items-start gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+              <span className="text-gray-700">{data.tips}</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Daily Itinerary */}
+        {data.days.map((day: any, index: number) => (
+          <div key={index}>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Day {index + 1} – {day.title} ({day.date})
+            </h2>
+            <ul className="space-y-2 mb-4">
+              {day.steps.map((step: any, stepIndex: number) => (
+                <li key={stepIndex} className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                  <span className="text-gray-700">
+                    {step.time && <strong>{step.time} – </strong>}
+                    {step.text}
+                    {step.mode && <span className="text-gray-500"> ({step.mode})</span>}
+                    {step.cost && <span className="font-medium text-green-600"> · {step.cost}</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {day.cost && (
+              <div className="bg-gray-100 p-3 rounded-lg flex justify-between items-center">
+                <span className="font-semibold">Estimated day total</span>
+                <span className="font-bold text-lg">{day.cost}</span>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Grand Total */}
+        {data.totalCost && (
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Grand Total</h2>
+            <p className="text-2xl font-bold text-blue-600">{data.totalCost}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Fallback markdown renderer for non-structured responses
   const renderMarkdown = (content: string) => {
     return content.split('\n').map((line, index) => {
       const trimmed = line.trim();
@@ -202,18 +236,6 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
             {trimmed.replace(/^[*-] /, '')}
           </li>
         );
-      } else if (trimmed.includes('**') && trimmed.includes('**')) {
-        // Handle bold text
-        const parts = trimmed.split('**');
-        return (
-          <p key={index} className="mb-3 text-gray-700 leading-relaxed">
-            {parts.map((part, partIndex) => (
-              partIndex % 2 === 1 ? 
-                <strong key={partIndex} className="font-medium text-gray-900">{part}</strong> : 
-                part
-            ))}
-          </p>
-        );
       } else {
         return (
           <p key={index} className="mb-3 text-gray-700 leading-relaxed">
@@ -235,7 +257,7 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
             <div className="flex gap-3">
               <Button 
                 onClick={handleExportPdf} 
-                disabled={isGeneratingPdf}
+                disabled={isGeneratingPdf || !structuredData}
                 className="bg-primary hover:bg-primary/90 text-white px-6"
               >
                 <Download className="h-4 w-4 mr-2" />
@@ -253,7 +275,7 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
         </CardHeader>
         <CardContent className="p-8">
           <div className="prose prose-lg max-w-none">
-            {renderMarkdown(itinerary)}
+            {structuredData ? renderStructuredContent(structuredData) : renderMarkdown(itinerary)}
           </div>
         </CardContent>
       </Card>

@@ -65,10 +65,10 @@ export async function POST(req: Request) {
   try {
     const form = await req.json();
     
-    // Calculate duration and format dates
-    const duration = Math.ceil((form.dateRange.to.getTime() - form.dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+    // Convert string dates to Date objects before calculating duration
     const startDate = new Date(form.dateRange.from);
     const endDate = new Date(form.dateRange.to);
+    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     
     const prompt = `Generate a comprehensive budget itinerary for ${form.destination}
 Travel dates: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}

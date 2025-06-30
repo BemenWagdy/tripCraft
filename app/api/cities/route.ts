@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   try {
     const res = await fetch(`${API}?limit=10&namePrefix=${encodeURIComponent(q)}`, {
       headers: {
-        'X-RapidAPI-Key': process.env.GEODB_API_KEY || 'demo-key',
+        'X-RapidAPI-Key': process.env.GEODB_API_KEY || 'f700ed8c38msh9b750446a747eefp169a29jsn3fe98a275f61',
         'X-RapidAPI-Host': 'wft-geo-db.p.rapidapi.com',
       },
       next: { revalidate: 60 },

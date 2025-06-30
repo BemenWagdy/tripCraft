@@ -12,15 +12,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
-import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plane, MapPin, Calendar as CalendarIcon, Users, DollarSign, Heart, Utensils, Home, Car, Gift, Eye, AlertTriangle } from 'lucide-react';
 import DestinationField from './DestinationField';
+import { DateRangeField } from './DateRangeField';
 
 import clsx from 'clsx';
 import { useState } from 'react';
-import { DateRange } from 'react-day-picker';
 import Result from './Result';
 import { appendError } from '@/lib/logger';
 
@@ -84,11 +83,6 @@ export default function Questionnaire() {
     },
   });
 
-  const [range, setRange] = useState<DateRange>({
-    from: methods.getValues('dateRange').from,
-    to: methods.getValues('dateRange').to,
-  });
-
   const onSubmit = async (values: QuestionnaireValues) => {
     setIsLoading(true);
     
@@ -110,7 +104,10 @@ export default function Questionnaire() {
         occasion: values.occasion,
         mustSee: values.mustSee,
         avoid: values.avoid,
-        dateRange: values.dateRange,
+        dateRange: {
+          from: values.dateRange.from.toISOString(),
+          to: values.dateRange.to.toISOString()
+        },
       };
 
       const response = await fetch('/api/ai', {
@@ -122,7 +119,7 @@ export default function Questionnaire() {
       });
 
       const data = await response.json();
-      setItinerary(data.markdown);
+      setItinerary(JSON.stringify(data));
     } catch (err) {
       appendError(err, 'questionnaire-submit');
       setItinerary(`# Error Generating Itinerary
@@ -205,19 +202,7 @@ We encountered an issue generating your itinerary. Please try again later.
                       Travel dates
                     </FormLabel>
                     <FormControl>
-                      <Calendar
-                        mode="range"
-                        numberOfMonths={2}
-                        selected={range}
-                        onSelect={(r) => {
-                          if (r?.from && r?.to) {
-                            setRange(r);
-                            methods.setValue('dateRange', { from: r.from, to: r.to }, { shouldValidate: true });
-                          }
-                        }}
-                        className="rounded-md border bg-white"
-                        disabled={(date) => date < new Date()}
-                      />
+                      <DateRangeField form={methods} name="dateRange" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

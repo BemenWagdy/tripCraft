@@ -1,81 +1,76 @@
-import { groq, MODEL } from '@/lib/groq';
+import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
-  const form = await req.json();
-
-  /* derive tripLength from range (if provided) */
-  const days =
-    form.dateRange?.from && form.dateRange?.to
-      ? Math.ceil(
-          (new Date(form.dateRange.to).getTime() -
-            new Date(form.dateRange.from).getTime()) /
-            86_400_000
-        ) + 1
-      : 0; // 0 = AI picks
-
-  /* ---------- GROQ CHAT COMPLETION ---------- */
   try {
+    const form = await req.json();
+    
+    const prompt = `Create a detailed travel itinerary based on these preferences:
+    
+Destination: ${form.destination}
+Food Style: ${form.foodStyle}
+Travel Style: ${form.travelStyle}
+Interests: ${form.interests.join(', ')}
+Daily Budget: $${form.dailyBudget}
+Duration: ${form.duration} days
+
+Please provide a comprehensive itinerary in markdown format with:
+- A brief introduction to the destination
+- Day-by-day breakdown with activities, meals, and accommodation suggestions
+- Budget estimates for each day
+- Local tips and recommendations
+- Transportation suggestions
+
+Format the response as clean markdown with headers, bullet points, and clear sections.`;
+
     const chat = await groq.chat.completions.create({
-      model: MODEL, // 'llama3-70b-8192'
-      temperature: 0.7,
+      model: GROQ_MODEL,
       messages: [
-        {
-          role: 'system',
-          content: [
-            'You are TripCraft, an award-winning travel planner.',
-            'Always write in **markdown** and group content with clear headings.',
-            'Format each day as **Morning / Afternoon / Evening** bullet lists.',
-            'Add local eateries, hidden gems, budget estimates and pro tips.',
-            'Prefer second-person voice ("You will start your day at…").',
-            'Currency: US $ unless otherwise noted.',
-          ].join('\n'),
+        { 
+          role: 'system', 
+          content: 'You are an expert travel planner who creates detailed, practical itineraries. Provide specific recommendations with estimated costs and practical tips.' 
         },
-        {
-          role: 'user',
-          content: `
-Destination : ${form.destination}
-
-Dates     : ${
-            form.dateRange?.from && form.dateRange?.to
-              ? `${form.dateRange.from.slice(0, 10)} → ${form.dateRange.to.slice(
-                  0,
-                  10
-                )}  (${days} days)`
-              : 'Not fixed – suggest anytime in the next 6 months'
-          }
-
-Group type : ${form.groupType}
-Ages    : ${form.ages?.join('-')}
-Budget/day : $${form.budgetPerDay}
-Accommodation: ${form.accommodation.join(', ')}
-Pace    : ${form.travelPace}
-Interests  : ${form.interests.join(', ')}
-Dietary   : ${form.dietary}
-Activity lvl: ${form.activityLevel}/5
-Mobility  : ${form.mobilityNeeds?.join(', ') || 'None'}
-Transport  : ${form.transportPref}
-Language  : ${form.language}
-Eco-pref  : ${form.sustainability ? 'Yes' : 'No'}
-Occasion  : ${form.specialOccasion}
-Must-see  : ${form.mustSee || '—'}
-Avoid    : ${form.avoid || '—'}
-
-TASK → Craft a **${days || '2-4'}-day** itinerary that feels PERSONAL and wow-worthy.  
-Include a short intro, daily schedule, nightly hotel suggestion and a per-day budget table.  
-Finish with local tips & transport advice.  Use markdown headings. Do NOT output code fences.
-`.trim(),
-        },
+        { 
+          role: 'user', 
+          content: prompt 
+        }
       ],
+      temperature: 0.7,
+      max_tokens: 2000
     });
 
-    return NextResponse.json({ markdown: chat.choices[0].message.content });
+    return NextResponse.json({ 
+      markdown: chat.choices[0].message.content || 'No content generated'
+    });
   } catch (err) {
-    appendError(err, 'ai');
-    return NextResponse.json(
-      { error: 'AI request failed, please try again.' },
-      { status: 500 }
-    );
+    appendError(err, 'groq-api');
+    
+    // Fallback response
+    const form = await req.json().catch(() => ({ destination: 'Unknown' }));
+    return NextResponse.json({
+      markdown: `# ${form.destination} Travel Itinerary
+
+## Day 1: Arrival & Exploration
+- **Morning**: Arrive and check into accommodation
+- **Afternoon**: Explore the city center and main attractions  
+- **Evening**: Dinner at a local restaurant
+- **Budget**: $80-120
+
+## Day 2: Cultural Immersion  
+- **Morning**: Visit museums and cultural sites
+- **Afternoon**: Food tour or cooking class
+- **Evening**: Local entertainment or nightlife
+- **Budget**: $70-100
+
+## Day 3: Adventure & Relaxation
+- **Morning**: Outdoor activities or excursions
+- **Afternoon**: Shopping and local markets
+- **Evening**: Farewell dinner
+- **Budget**: $90-130
+
+*Note: This is a sample itinerary. The AI service is temporarily unavailable.*`,
+      note: 'Fallback itinerary - Groq service unavailable'
+    });
   }
 }

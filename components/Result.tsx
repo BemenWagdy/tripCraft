@@ -27,7 +27,7 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
       const { pdf } = await import('@react-pdf/renderer');
       const { default: PdfDocComponent } = await import('./PdfDoc');
       
-      const doc = React.createElement(PdfDocComponent, { markdown: itinerary });
+      const doc = React.createElement(PdfDocComponent, { markdown: itinerary, destination });
       const asPdf = pdf(doc);
       const blob = await asPdf.toBlob();
       

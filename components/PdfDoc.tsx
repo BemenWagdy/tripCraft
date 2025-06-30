@@ -1,4 +1,3 @@
-'use client';
 import {
   Document,
   Page,
@@ -7,56 +6,120 @@ import {
   StyleSheet,
 } from '@react-pdf/renderer';
 
-/* brand styles */
+// ---------- Styles ----------
+const palette = {
+  primary: '#2563eb',   // Tailwind blue-600
+  text:    '#111827',   // Tailwind gray-900
+  light:   '#6b7280',   // Tailwind gray-500
+};
+
 const styles = StyleSheet.create({
-  page:   { padding: 40, fontSize: 11, fontFamily: 'Helvetica' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  title:  { fontSize: 18, fontWeight: 'bold', color: '#2563eb' },
-  tag:    { fontSize: 10, color: '#888' },
-  h2:     { fontSize: 14, fontWeight: 'bold', marginTop: 12, marginBottom: 6, color: '#1e40af' },
-  p:      { marginBottom: 4, lineHeight: 1.4 },
-  bullet: { flexDirection: 'row', gap: 4, marginBottom: 2 },
-  dot:    { fontSize: 10, marginRight: 4, color: '#f97316' },
-  footer: { marginTop: 24, borderTop: 1, paddingTop: 8, fontSize: 9, color: '#888', textAlign: 'center' },
+  /* shared */
+  page:   { padding: 40, fontFamily: 'Helvetica', fontSize: 11, color: palette.text },
+  h1:     { fontSize: 28, fontFamily: 'Helvetica-Bold', marginBottom: 8 },
+  h2:     { fontSize: 20, fontFamily: 'Helvetica-Bold', margin: 12  },
+  h3:     { fontSize: 14, fontFamily: 'Helvetica-Bold', marginTop: 8 },
+
+  /* cover page */
+  coverWrap: { alignItems: 'center', justifyContent: 'center', flex: 1 },
+  bar:   { height: 8, width: '100%', backgroundColor: palette.primary, marginBottom: 24 },
+  subtitle: { fontSize: 14, color: palette.light, marginBottom: 4 },
+
+  /* side strip (every content page) */
+  side:  {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
+    backgroundColor: palette.primary,
+  },
+  sideText: {
+    position: 'absolute',
+    bottom: 24,
+    left: -90,
+    transformOrigin: 'top left',
+    transform: 'rotate(-90deg)',
+    color: '#fff',
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+  },
+
+  /* body text */
+  p:     { marginVertical: 2, lineHeight: 1.35 },
+  bullet:{ flexDirection: 'row', marginVertical: 1 },
+  dot:   { width: 6, height: 6, borderRadius: 3, marginTop: 4, marginRight: 6, backgroundColor: palette.primary },
+  col:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
 });
 
-function stripMd(line: string) {
-  return line
-    .replace(/^#+\s*/, '')
-    .replace(/^[-*•]\s+/, '')
-    .replace(/[*`_~]/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+// ---------- Helpers ----------
+const Bullet = ({ children }: { children: React.ReactNode }) => (
+  <View style={styles.bullet}>
+    <View style={styles.dot} />
+    <Text style={styles.p}>{children}</Text>
+  </View>
+);
+
+// ---------- Main component ----------
+interface ItineraryDay {
+  title: string;                     // "Day 1: Giza Pyramids"
+  date?: string;                     // "Tue 30 Jun"
+  entries: string[];                 // lines / bullets
+  budget?: string;                   // optional total
 }
 
-export default function PdfDoc({ markdown }: { markdown: string }) {
-  const raw = markdown.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+interface PdfProps {
+  traveller: string;                 // e.g. "Ali Hassan"
+  destination: string;               // e.g. "Cairo, Egypt"
+  dateRange: string;                 // e.g. "30 Jun – 14 Jul 2025"
+  intro: string;                     // paragraph intro
+  days: ItineraryDay[];              // parsed itinerary
+}
+
+export default function PdfDoc(props: PdfProps) {
+  const { traveller, destination, dateRange, intro, days } = props;
 
   return (
-    <Document>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>TripCraft Itinerary</Text>
-          <Text style={styles.tag}>tripcraft.ai</Text>
+    <Document title={`TripCraft – ${destination} itinerary`}>
+      {/* COVER */}
+      <Page size="A4" style={{ ...styles.page, padding: 0 }}>
+        <View style={styles.bar} />
+        <View style={styles.coverWrap}>
+          <Text style={styles.h1}>{destination}</Text>
+          <Text style={styles.subtitle}>{dateRange}</Text>
+          <Text style={{ ...styles.subtitle, marginTop: 20 }}>
+            Personalised for {traveller}
+          </Text>
         </View>
-
-        {raw.map((ln, i) =>
-          /^day\s+\d/i.test(ln) ? (
-            <Text key={i} style={styles.h2}>{stripMd(ln)}</Text>
-          ) : /^[-*•]\s+/.test(ln) ? (
-            <View key={i} style={styles.bullet}>
-              <Text style={styles.dot}>•</Text>
-              <Text style={[styles.p, { flex: 1 }]}>{stripMd(ln)}</Text>
-            </View>
-          ) : (
-            <Text key={i} style={styles.p}>{stripMd(ln)}</Text>
-          )
-        )}
-
-        <Text style={styles.footer}>
-          Generated with Groq Llama-3 • © {new Date().getFullYear()} TripCraft
-        </Text>
       </Page>
+
+      {/* CONTENT PAGES */}
+      {days.map((d, i) => (
+        <Page size="A4" key={i} style={styles.page}>
+          {/* side strip */}
+          <View style={styles.side} />
+          <Text style={styles.sideText}>
+            {traveller} · p.{i + 2}
+          </Text>
+
+          <Text style={styles.h2}>{d.title}</Text>
+          {d.date && <Text style={{ ...styles.p, color: palette.light }}>{d.date}</Text>}
+          {i === 0 && (
+            <Text style={{ ...styles.p, marginVertical: 8 }}>{intro}</Text>
+          )}
+
+          {d.entries.map((line, idx) => (
+            <Bullet key={idx}>{line}</Bullet>
+          ))}
+
+          {d.budget && (
+            <View style={styles.col}>
+              <Text style={styles.h3}>Daily budget</Text>
+              <Text style={styles.h3}>{d.budget}</Text>
+            </View>
+          )}
+        </Page>
+      ))}
     </Document>
   );
 }

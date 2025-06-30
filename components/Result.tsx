@@ -16,6 +16,87 @@ interface ResultProps {
   onBack: () => void;
 }
 
+// Helper function to parse markdown itinerary into structured data
+function parseItinerary(markdown: string, destination: string) {
+  const lines = markdown.split('\n').map(line => line.trim()).filter(Boolean);
+  
+  let intro = '';
+  const days: Array<{
+    title: string;
+    date?: string;
+    entries: string[];
+    budget?: string;
+  }> = [];
+  
+  let currentDay: any = null;
+  let foundFirstDay = false;
+  
+  for (const line of lines) {
+    // Skip the main title
+    if (line.startsWith('# ')) {
+      continue;
+    }
+    
+    // Day headers (## Day 1: ... or ## Day 1 - ...)
+    if (line.match(/^##\s*Day\s+\d+/i)) {
+      if (currentDay) {
+        days.push(currentDay);
+      }
+      currentDay = {
+        title: line.replace(/^##\s*/, ''),
+        entries: [],
+      };
+      foundFirstDay = true;
+      continue;
+    }
+    
+    // Budget lines
+    if (currentDay && (line.includes('Budget:') || line.includes('$'))) {
+      const budgetMatch = line.match(/\$[\d,]+/);
+      if (budgetMatch) {
+        currentDay.budget = budgetMatch[0];
+      }
+      continue;
+    }
+    
+    // Bullet points
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      if (currentDay) {
+        currentDay.entries.push(line.replace(/^[*-]\s*/, ''));
+      }
+      continue;
+    }
+    
+    // Regular paragraphs
+    if (!foundFirstDay && line.length > 20) {
+      intro += (intro ? ' ' : '') + line;
+    } else if (currentDay && line.length > 10) {
+      currentDay.entries.push(line);
+    }
+  }
+  
+  // Add the last day
+  if (currentDay) {
+    days.push(currentDay);
+  }
+  
+  // Fallback if no days were parsed
+  if (days.length === 0) {
+    days.push({
+      title: 'Your Itinerary',
+      entries: lines.filter(line => 
+        !line.startsWith('#') && 
+        line.length > 10
+      ).slice(0, 10)
+    });
+  }
+  
+  return {
+    intro: intro || `Welcome to your personalized ${destination} adventure! This itinerary has been crafted specifically for your preferences and travel style.`,
+    days
+  };
+}
+
 const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = React.useState(false);
 
@@ -23,11 +104,31 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
     try {
       setIsGeneratingPdf(true);
       
+      // Parse the markdown itinerary
+      const parsed = parseItinerary(itinerary, destination);
+      
+      // Create PDF data structure
+      const pdfData = {
+        traveller: 'Solo Traveller', // Could be extracted from form data if available
+        destination: destination,
+        dateRange: new Date().toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          year: 'numeric'
+        }) + ' – ' + new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          year: 'numeric'
+        }),
+        intro: parsed.intro,
+        days: parsed.days,
+      };
+      
       // Dynamically import pdf function to avoid SSR issues
       const { pdf } = await import('@react-pdf/renderer');
       const { default: PdfDocComponent } = await import('./PdfDoc');
       
-      const doc = React.createElement(PdfDocComponent, { markdown: itinerary, destination });
+      const doc = React.createElement(PdfDocComponent, pdfData);
       const asPdf = pdf(doc);
       const blob = await asPdf.toBlob();
       

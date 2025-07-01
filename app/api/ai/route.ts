@@ -2,91 +2,6 @@ import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
-// ─── 🛠️  Prompt-builder ───────────────────────────────────────────
-type TripForm = {
-  destination: string;          // "Cairo, Egypt"
-  dateRange:  { from: string; to: string };   // ISO strings
-  homeAirport?: string;         // "LHR" - optional
-  arrivalEta?: string;          // "14:25" - optional
-  groupType: string;            // "Solo", "Couple", etc.
-  dailyBudget: number;          // 100
-  currency?: string;            // "USD" - optional, default to USD
-  interests: string[];          // ["Food", "History"]
-  travelVibe: string;           // "Relaxed", "Balanced", "Adventure"
-  accommodation: string;        // "Hostel", "Budget", "Boutique", etc.
-  transportPref: string;        // "Public Transit", etc.
-  dietary?: string;             // "Vegetarian", etc.
-  occasion?: string;            // "Honeymoon", etc.
-  mustSee?: string;             // Optional must-see spots
-  avoid?: string;               // Optional things to avoid
-};
-
-function buildPrompt(f: TripForm) {
-  const interestsStr = Array.isArray(f.interests) ? f.interests.join(', ') : f.interests;
-  const currency = f.currency || 'USD';
-  const groupDesc = f.groupType === 'Solo' ? '1 adult' : f.groupType.toLowerCase();
-  
-  return `
-You are an expert travel planner AI. Build a **comprehensive, practical, and update-proof itinerary** for the following trip:
-
-• Destination(s): ${f.destination}
-• Dates & length: ${f.dateRange.from} – ${f.dateRange.to}
-• Group profile: ${groupDesc}
-• Daily budget target (per person) in ${currency}: ${f.dailyBudget}
-• Interests / must-dos: ${interestsStr}
-• Travel vibe: ${f.travelVibe}
-• Accommodation style: ${f.accommodation}
-• Transportation preference: ${f.transportPref}
-${f.dietary && f.dietary !== 'None' ? `• Dietary requirements: ${f.dietary}` : ''}
-${f.occasion && f.occasion !== 'None' ? `• Special occasion: ${f.occasion}` : ''}
-${f.mustSee ? `• Must-see spots: ${f.mustSee}` : ''}
-${f.avoid ? `• Things to avoid: ${f.avoid}` : ''}
-
-**CRITICAL: You MUST call the generate_itinerary function with structured JSON data that matches the schema exactly.**
-
-**REQUIREMENTS:**
-1. **beforeYouGo**: Provide 8-10 essential pre-travel tips (visa requirements, SIM cards, cash needs, safety alerts, weather prep, cultural awareness, health/insurance, emergency contacts)
-
-2. **cultureTips**: Provide 10-15 specific local etiquette tips (greetings, dress codes, tipping customs, dining etiquette, religious site behavior, bargaining practices, gesture awareness, public transport manners, photography restrictions, social norms)
-
-3. **foodList**: Provide 10-20 must-try food items with:
-   - name: dish or restaurant name
-   - note: brief description or location
-   - rating: numerical rating 0-5 (realistic, based on actual reviews)
-   - source: rating source like "Google Maps", "TripAdvisor", "Yelp", "Lonely Planet"
-
-4. **days**: Each day must have 8+ detailed steps covering early morning to late night:
-   - Include specific times (e.g., "08:30", "14:00")
-   - Realistic transportation modes and costs
-   - Specific locations and activities
-   - Meal suggestions with estimated costs
-   - Consider the ${f.travelVibe} pace and ${f.accommodation} accommodation level
-
-5. **currency**: Provide accurate exchange rate for local currency to USD (2025 rates)
-
-6. **averages**: Realistic accommodation costs per night:
-   - hostel: budget dormitory/shared room
-   - midHotel: 3-star hotel or boutique accommodation  
-   - highEnd: 4-5 star luxury accommodation
-
-7. **visa**: Current visa requirements and entry rules
-
-8. **weather**: Seasonal weather patterns and what to expect during travel dates
-
-9. **tips**: Practical travel tips specific to the destination
-
-10. **totalCost**: Estimated total trip cost based on daily budget and duration
-
-**FORMATTING:**
-- All dates in YYYY-MM-DD format
-- Costs in local currency with USD equivalent when helpful
-- Be specific with locations, times, and practical details
-- Account for ${f.dailyBudget} daily budget constraint
-- Match ${f.travelVibe} energy level in activity planning
-- Consider ${f.groupType} group dynamics in recommendations
-`.trim();
-}
-
 const schema = {
   name: 'generate_itinerary',
   description: 'Return a fully-structured travel plan',
@@ -95,11 +10,11 @@ const schema = {
     properties: {
       intro:   { type: 'string' },
 
-      beforeYouGo: {                      // ⬅️  new block
+      beforeYouGo: {                      // ⬅️  reduced minimum
         type: 'array',
-        description: '8-10 key facts to know before arrival',
+        description: '3-10 key facts to know before arrival',
         items: { type: 'string' },
-        minItems: 8,  maxItems: 10
+        minItems: 3,  maxItems: 10
       },
 
       visa:    { type: 'string' },
@@ -124,14 +39,14 @@ const schema = {
 
       weather: { type: 'string' },
 
-      cultureTips: {                     // ⬅️  now 10 items
+      cultureTips: {                     // ⬅️  reduced minimum
         type: 'array',
         description: 'Local etiquette, dress, bargaining, etc.',
         items: { type: 'string' },
-        minItems: 10, maxItems: 15
+        minItems: 5, maxItems: 15
       },
 
-      foodList: {                        // ⬅️  rated food list
+      foodList: {                        // ⬅️  reduced minimum
         type: 'array',
         description: 'Must-try dishes or restaurants with rating & source',
         items: {
@@ -144,7 +59,7 @@ const schema = {
           },
           required: ['name', 'rating', 'source']
         },
-        minItems: 10, maxItems: 20
+        minItems: 5, maxItems: 20
       },
 
       tips: { type: 'string' },
@@ -194,9 +109,6 @@ export async function POST(req: Request) {
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Build enhanced prompt using the helper
-    const prompt = buildPrompt(form as TripForm);
-
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,
       temperature: 0.7,
@@ -208,7 +120,37 @@ export async function POST(req: Request) {
         },
         {
           role: 'user',
-          content: prompt
+          content: `
+            Generate a detailed budget itinerary for ${form.destination}
+            • Date range: ${form.dateRange.from} to ${form.dateRange.to}
+            • Daily budget: $${form.dailyBudget}
+            • Duration: ${duration} days
+            • Group type: ${form.groupType}
+            • Travel vibe: ${form.travelVibe}
+            • Interests: ${form.interests?.join(', ') || 'General sightseeing'}
+            • Dietary preferences: ${form.dietary}
+            • Accommodation: ${form.accommodation}
+            • Transportation: ${form.transportPref}
+            • Special occasion: ${form.occasion}
+            • Must-see: ${form.mustSee || 'None'}
+            • Avoid: ${form.avoid || 'None'}
+
+            REQUIREMENTS
+            1. Call the function "generate_itinerary" with JSON that matches the schema.
+            2. "beforeYouGo": 3-10 key bullets (safety, SIM cards, cash, etc.).
+            3. "cultureTips": at least 5 concise etiquette tips.
+            4. "foodList": 5-20 items. Each must include rating (0-5) and rating source.
+            5. Each day must have 8+ steps covering early morning to late night with
+               realistic transport modes and prices checked against 2025 data.
+            6. All dates must be ISO-8601 YYYY-MM-DD format.
+            7. Consider their ${form.travelVibe} vibe and ${form.interests?.join(', ')} interests.
+            8. Match their $${form.dailyBudget} daily budget and ${form.accommodation} accommodation preference.
+            9. Account for ${form.transportPref} transportation and ${form.groupType} group type.
+            ${form.dietary && form.dietary !== 'None' ? `10. Include ${form.dietary} dining options.` : ''}
+            ${form.occasion && form.occasion !== 'None' ? `11. Add special touches for ${form.occasion}.` : ''}
+            ${form.mustSee ? `12. Include: ${form.mustSee}` : ''}
+            ${form.avoid ? `13. Avoid: ${form.avoid}` : ''}
+          `
         }
       ]
     });
@@ -233,12 +175,7 @@ export async function POST(req: Request) {
       beforeYouGo: [
         "Check visa requirements for your nationality",
         "Get travel insurance before departure",
-        "Notify your bank of travel plans",
-        "Download offline maps and translation apps",
-        "Pack appropriate clothing for the climate",
-        "Bring universal power adapters",
-        "Keep digital copies of important documents",
-        "Research local emergency numbers"
+        "Notify your bank of travel plans"
       ],
       visa: "Check current visa requirements for your nationality before travel. Some countries offer visa-on-arrival or e-visa options.",
       currency: { code: "USD", rateUsd: 1 },
@@ -249,12 +186,7 @@ export async function POST(req: Request) {
         "Research appropriate dress codes for religious sites",
         "Understand local tipping customs and expectations",
         "Be aware of cultural gestures that might be offensive",
-        "Respect photography restrictions in certain areas",
-        "Learn about local dining etiquette and meal times",
-        "Understand bargaining practices in markets",
-        "Be mindful of personal space and physical contact norms",
-        "Research local holidays that might affect opening hours",
-        "Understand appropriate behavior in public transportation"
+        "Respect photography restrictions in certain areas"
       ],
       foodList: [
         { name: "Local Street Food", note: "Try authentic street vendors", rating: 4.5, source: "TripAdvisor" },

@@ -93,92 +93,140 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
         </div>
 
         {/* Before You Go */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2">
-            Before You Go
-          </h2>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-              <span className="text-gray-700">{data.visa}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-              <span className="text-gray-700">Currency: 1 {data.currency.code} ≈ ${data.currency.rateUsd.toFixed(2)} USD</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-              <span className="text-gray-700">{data.weather}</span>
-            </li>
-          </ul>
-        </div>
+        {data.beforeYouGo && (
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2">
+              Before You Go
+            </h2>
+            <ul className="space-y-2">
+              {data.beforeYouGo.map((item: string, index: number) => (
+                <li key={index} className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                  <span className="text-gray-700">{item}</span>
+                </li>
+              ))}
+              {data.visa && (
+                <li className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                  <span className="text-gray-700">{data.visa}</span>
+                </li>
+              )}
+              {data.currency && (
+                <li className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                  <span className="text-gray-700">Currency: 1 {data.currency.code} ≈ ${data.currency.rateUsd.toFixed(2)} USD</span>
+                </li>
+              )}
+              {data.weather && (
+                <li className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                  <span className="text-gray-700">{data.weather}</span>
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
 
         {/* Accommodation */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-            Average Accommodation
-          </h2>
-          <div className="bg-gray-50 rounded-lg overflow-hidden">
-            <div className="bg-blue-500 text-white p-3 flex justify-between font-semibold">
-              <span>Type</span>
-              <span>Price / night</span>
-            </div>
-            <div className="divide-y divide-gray-200">
-              <div className="p-3 flex justify-between">
-                <span>Hostel</span>
-                <span className="font-medium">${data.averages.hostel}</span>
+        {data.averages && (
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+              Average Accommodation
+            </h2>
+            <div className="bg-gray-50 rounded-lg overflow-hidden">
+              <div className="bg-blue-500 text-white p-3 flex justify-between font-semibold">
+                <span>Type</span>
+                <span>Price / night</span>
               </div>
-              <div className="p-3 flex justify-between">
-                <span>Mid-range hotel</span>
-                <span className="font-medium">${data.averages.midHotel}</span>
-              </div>
-              <div className="p-3 flex justify-between">
-                <span>High-end hotel</span>
-                <span className="font-medium">${data.averages.highEnd}</span>
+              <div className="divide-y divide-gray-200">
+                {data.averages.hostel && (
+                  <div className="p-3 flex justify-between">
+                    <span>Hostel</span>
+                    <span className="font-medium">${data.averages.hostel}</span>
+                  </div>
+                )}
+                {data.averages.midHotel && (
+                  <div className="p-3 flex justify-between">
+                    <span>Mid-range hotel</span>
+                    <span className="font-medium">${data.averages.midHotel}</span>
+                  </div>
+                )}
+                {data.averages.highEnd && (
+                  <div className="p-3 flex justify-between">
+                    <span>High-end hotel</span>
+                    <span className="font-medium">${data.averages.highEnd}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Culture & Food */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-            Local Culture & Food
-          </h2>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-              <span className="text-gray-700">{data.culture}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-              <span className="text-gray-700">{data.food}</span>
-            </li>
-          </ul>
-        </div>
+        {/* Culture Tips */}
+        {data.cultureTips && data.cultureTips.length > 0 && (
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+              Culture Tips
+            </h2>
+            <ul className="space-y-2">
+              {data.cultureTips.map((tip: string, index: number) => (
+                <li key={index} className="flex items-start gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                  <span className="text-gray-700">{tip}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Food List */}
+        {data.foodList && data.foodList.length > 0 && (
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+              Must-Try Food
+            </h2>
+            <div className="grid gap-3">
+              {data.foodList.map((food: any, index: number) => (
+                <div key={index} className="bg-gray-50 p-3 rounded-lg">
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-semibold text-gray-800">{food.name}</h3>
+                    <div className="text-sm text-gray-600">
+                      ⭐ {food.rating} ({food.source})
+                    </div>
+                  </div>
+                  {food.note && (
+                    <p className="text-gray-600 text-sm">{food.note}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tips */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-            Tips & Tricks
-          </h2>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-              <span className="text-gray-700">{data.tips}</span>
-            </li>
-          </ul>
-        </div>
+        {data.tips && (
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+              Tips & Tricks
+            </h2>
+            <ul className="space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                <span className="text-gray-700">{data.tips}</span>
+              </li>
+            </ul>
+          </div>
+        )}
 
         {/* Daily Itinerary */}
-        {data.days.map((day: any, index: number) => (
+        {data.days && data.days.map((day: any, index: number) => (
           <div key={index}>
             <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2">
               <Calendar className="h-5 w-5 text-primary" />
               Day {index + 1} – {day.title} ({day.date})
             </h2>
             <ul className="space-y-2 mb-4">
-              {day.steps.map((step: any, stepIndex: number) => (
+              {day.steps && day.steps.map((step: any, stepIndex: number) => (
                 <li key={stepIndex} className="flex items-start gap-2">
                   <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
                   <span className="text-gray-700">

@@ -22,24 +22,30 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
 
   // Parse the JSON response when component mounts
   React.useEffect(() => {
-    try {
-      const parsed = JSON.parse(itinerary);
-      setStructuredData({
-        ...parsed,
-        destination: destination,
-        dateRange: new Date().toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric',
-          year: 'numeric'
-        }) + ' – ' + new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric',
-          year: 'numeric'
-        })
-      });
-    } catch (err) {
-      console.error('Failed to parse structured data:', err);
-      // Fallback to treating as markdown
+    // Check if the itinerary string starts with '{' to determine if it's JSON
+    if (itinerary.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(itinerary);
+        setStructuredData({
+          ...parsed,
+          destination: destination,
+          dateRange: new Date().toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            year: 'numeric'
+          }) + ' – ' + new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            year: 'numeric'
+          })
+        });
+      } catch (err) {
+        // Only log parsing errors for content that looks like JSON
+        console.error('Failed to parse JSON itinerary:', err);
+        setStructuredData(null);
+      }
+    } else {
+      // Content is not JSON (likely markdown or HTML), set to null without error
       setStructuredData(null);
     }
   }, [itinerary, destination]);

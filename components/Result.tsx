@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, MapPin, Calendar } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { appendError } from '@/lib/logger';
+import QRCodeRenderer from './QRCodeRenderer';
+import { generateMapLink } from '@/lib/qr';
 
 // Dynamically import PDF components to avoid SSR issues
 const PdfDoc = dynamic(() => import('./PdfDoc'), { ssr: false });
@@ -26,7 +28,9 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
     if (itinerary.trim().startsWith('{')) {
       try {
         const parsed = JSON.parse(itinerary);
-        setStructuredData({
+        
+        // Add map links to each step
+        const enhancedData = {
           ...parsed,
           destination: destination,
           dateRange: new Date().toLocaleDateString('en-US', { 
@@ -37,8 +41,17 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
             month: 'short', 
             day: 'numeric',
             year: 'numeric'
-          })
-        });
+          }),
+          days: parsed.days?.map((day: any) => ({
+            ...day,
+            steps: day.steps?.map((step: any) => ({
+              ...step,
+              mapLink: generateMapLink(`${step.text} ${destination}`)
+            }))
+          }))
+        };
+        
+        setStructuredData(enhancedData);
       } catch (err) {
         // Only log parsing errors for content that looks like JSON
         console.error('Failed to parse JSON itinerary:', err);
@@ -231,16 +244,24 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
               <Calendar className="h-5 w-5 text-primary" />
               Day {index + 1} – {day.title} ({day.date})
             </h2>
-            <ul className="space-y-2 mb-4">
+            <ul className="space-y-3 mb-4">
               {day.steps && day.steps.map((step: any, stepIndex: number) => (
-                <li key={stepIndex} className="flex items-start gap-2">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span className="text-gray-700">
-                    {step.time && <strong>{step.time} – </strong>}
-                    {step.text}
-                    {step.mode && <span className="text-gray-500"> ({step.mode})</span>}
-                    {step.cost && <span className="font-medium text-green-600"> · {step.cost}</span>}
-                  </span>
+                <li key={stepIndex} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <span className="text-gray-700">
+                      {step.time && <strong>{step.time} – </strong>}
+                      {step.text}
+                      {step.mode && <span className="text-gray-500"> ({step.mode})</span>}
+                      {step.cost && <span className="font-medium text-green-600"> · {step.cost}</span>}
+                    </span>
+                  </div>
+                  {step.mapLink && (
+                    <QRCodeRenderer 
+                      text={step.mapLink} 
+                      size={48} 
+                      className="ml-2"
+                    />
+                  )}
                 </li>
               ))}
             </ul>

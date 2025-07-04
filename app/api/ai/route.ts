@@ -125,6 +125,7 @@ export async function POST(req: Request) {
             • Date range: ${form.dateRange.from} to ${form.dateRange.to}
             • Daily budget: $${form.dailyBudget}
             • Duration: ${duration} days
+            • Traveller nationality: ${form.country}
             • Group type: ${form.groupType}
             • Travel vibe: ${form.travelVibe}
             • Interests: ${form.interests?.join(', ') || 'General sightseeing'}
@@ -146,10 +147,11 @@ export async function POST(req: Request) {
             7. Consider their ${form.travelVibe} vibe and ${form.interests?.join(', ')} interests.
             8. Match their $${form.dailyBudget} daily budget and ${form.accommodation} accommodation preference.
             9. Account for ${form.transportPref} transportation and ${form.groupType} group type.
-            ${form.dietary && form.dietary !== 'None' ? `10. Include ${form.dietary} dining options.` : ''}
-            ${form.occasion && form.occasion !== 'None' ? `11. Add special touches for ${form.occasion}.` : ''}
-            ${form.mustSee ? `12. Include: ${form.mustSee}` : ''}
-            ${form.avoid ? `13. Avoid: ${form.avoid}` : ''}
+            10. Use their nationality (${form.country}) for visa requirements and currency information.
+            ${form.dietary && form.dietary !== 'None' ? `11. Include ${form.dietary} dining options.` : ''}
+            ${form.occasion && form.occasion !== 'None' ? `12. Add special touches for ${form.occasion}.` : ''}
+            ${form.mustSee ? `13. Include: ${form.mustSee}` : ''}
+            ${form.avoid ? `14. Avoid: ${form.avoid}` : ''}
           `
         }
       ]

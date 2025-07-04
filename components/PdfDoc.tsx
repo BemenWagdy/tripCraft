@@ -1,7 +1,8 @@
 /* components/PdfDoc.tsx */
 import {
-  Document, Page, View, Text, StyleSheet
+  Document, Page, View, Text, StyleSheet, Image
 } from '@react-pdf/renderer';
+import { toDataURL } from '@/lib/qr';
 
 const c = { blue: '#2563eb', gray: '#6b7280', dark: '#111827' };
 
@@ -16,6 +17,9 @@ const st = StyleSheet.create({
   tblRow:{ flexDirection: 'row', borderBottom: 1, borderColor: '#eee', paddingVertical: 2 },
   cellL:{ width: '60%' }, 
   cellR:{ width: '40%', textAlign: 'right' },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', marginVertical: 1 },
+  stepText: { flex: 1, marginRight: 8 },
+  qrCode: { width: 40, height: 40, marginLeft: 8 }
 });
 
 const Bullet = ({ children }: { children: React.ReactNode }) => (
@@ -30,8 +34,13 @@ interface StructuredData {
   currency: { code: string; rateUsd: number };
   averages: { hostel: number; midHotel: number; highEnd: number };
   weather: string;
-  culture: string;
-  food: string;
+  cultureTips: string[];
+  foodList: Array<{
+    name: string;
+    note?: string;
+    rating: number;
+    source: string;
+  }>;
   tips: string;
   days: Array<{
     date: string;
@@ -42,6 +51,7 @@ interface StructuredData {
       text: string;
       mode?: string;
       cost?: string;
+      mapLink?: string;
     }>;
   }>;
   totalCost?: string;
@@ -50,7 +60,7 @@ interface StructuredData {
 export default function PdfDoc({ data }: { data: StructuredData }) {
   const {
     destination, dateRange, intro, visa, currency,
-    averages, weather, culture, food, tips, days, totalCost
+    averages, weather, cultureTips, foodList, tips, days, totalCost
   } = data;
 
   return (
@@ -86,9 +96,18 @@ export default function PdfDoc({ data }: { data: StructuredData }) {
           <Text style={st.cellR}>${averages.highEnd}</Text>
         </View>
 
-        <Text style={st.h2}>Local culture & food</Text>
-        <Bullet>{culture}</Bullet>
-        <Bullet>{food}</Bullet>
+        <Text style={st.h2}>Local culture</Text>
+        {cultureTips.map((tip, i) => (
+          <Bullet key={i}>{tip}</Bullet>
+        ))}
+        
+        <Text style={st.h2}>Must-try food</Text>
+        {foodList.map((food, i) => (
+          <Bullet key={i}>
+            {food.name} - ⭐ {food.rating} ({food.source})
+            {food.note && ` - ${food.note}`}
+          </Bullet>
+        ))}
         
         <Text style={st.h2}>Tips & tricks</Text>
         <Bullet>{tips}</Bullet>
@@ -98,11 +117,7 @@ export default function PdfDoc({ data }: { data: StructuredData }) {
           <View key={i} wrap>
             <Text style={st.h2}>Day {i + 1} – {d.title} ({d.date})</Text>
             {d.steps.map((s, idx) => (
-              <Bullet key={idx}>
-                {s.time && `${s.time} – `}{s.text}
-                {s.mode && ` (${s.mode})`}
-                {s.cost && ` · ${s.cost}`}
-              </Bullet>
+              <StepWithQR key={idx} step={s} />
             ))}
             {d.cost && (
               <View style={{ ...st.tblRow, backgroundColor: '#f9fafb' }}>
@@ -122,5 +137,34 @@ export default function PdfDoc({ data }: { data: StructuredData }) {
         )}
       </Page>
     </Document>
+  );
+}
+
+// Component to handle async QR code generation
+function StepWithQR({ step }: { step: any }) {
+  const [qrDataUrl, setQrDataUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (step.mapLink) {
+      toDataURL(step.mapLink).then(setQrDataUrl);
+    }
+  }, [step.mapLink]);
+
+  return (
+    <View style={st.stepRow}>
+      <View style={st.stepText}>
+        <Text style={st.p}>
+          {step.time && `${step.time} – `}{step.text}
+          {step.mode && ` (${step.mode})`}
+          {step.cost && ` · ${step.cost}`}
+        </Text>
+      </View>
+      {qrDataUrl && (
+        <Image
+          src={qrDataUrl}
+          style={st.qrCode}
+        />
+      )}
+    </View>
   );
 }

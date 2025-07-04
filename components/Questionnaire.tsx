@@ -13,10 +13,12 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plane, MapPin, Calendar as CalendarIcon, Users, DollarSign, Heart, Utensils, Home, Car, Gift, Eye, AlertTriangle } from 'lucide-react';
+import { Plane, MapPin, Calendar as CalendarIcon, Users, DollarSign, Heart, Utensils, Home, Car, Gift, Eye, AlertTriangle, Globe } from 'lucide-react';
 import DestinationField from './DestinationField';
 import { DateRangeField } from './DateRangeField';
+import { countries } from '@/lib/countries';
 
 import clsx from 'clsx';
 import { useState } from 'react';
@@ -42,6 +44,7 @@ export const questionnaireSchema = z.object({
   accommodation: z.enum(['Hostel','Budget','Boutique','Luxury','Resort','Apartment']),
   transportPref: z.enum(['Public Transit','Rental Car','Private Driver','Walk/Bike']),
   occasion: z.enum(['None','Honeymoon','Anniversary','Birthday','Graduation']),
+  country: z.string().min(2, 'Select your country'),
   mustSee: z.string().optional(),
   avoid: z.string().optional(),
 });
@@ -78,6 +81,7 @@ export default function Questionnaire() {
       accommodation: 'Boutique',
       transportPref: 'Public Transit',
       occasion: 'None',
+      country: '',
       mustSee: '',
       avoid: '',
     },
@@ -93,6 +97,7 @@ export default function Questionnaire() {
       // Transform data for the API
       const formData = {
         destination: values.destination,
+        country: values.country,
         foodStyle: values.dietary.toLowerCase(),
         travelStyle: values.travelVibe.toLowerCase(),
         interests: values.interests,
@@ -261,6 +266,35 @@ We encountered an issue generating your itinerary. Please try again later.
                     <FormDescription className="text-right font-medium text-lg">
                       ${field.value}
                     </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Country/Nationality */}
+              <FormField
+                control={methods.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <Globe className="h-5 w-5 text-blue-500" />
+                      Your nationality / passport
+                    </FormLabel>
+                    <FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose your country…" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          {countries.map(country => (
+                            <SelectItem key={country} value={country}>
+                              {country}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

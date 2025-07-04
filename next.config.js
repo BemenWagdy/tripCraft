@@ -5,6 +5,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: { unoptimized: true },
+  optimizeFonts: false, // Disable font optimization to prevent AbortError during build
   webpack(config) {
     config.cache = false;     // ← turns off the PackFileCacheStrategy
     return config;

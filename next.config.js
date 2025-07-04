@@ -8,6 +8,13 @@ const nextConfig = {
   optimizeFonts: false, // Disable font optimization to prevent AbortError during build
   webpack(config) {
     config.cache = false;     // ← turns off the PackFileCacheStrategy
+    
+    // Add fallback for encoding module to resolve node-fetch compatibility issues
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      encoding: false,
+    };
+    
     return config;
   },
 };

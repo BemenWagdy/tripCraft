@@ -10,11 +10,11 @@ const schema = {
     properties: {
       intro:   { type: 'string' },
 
-      beforeYouGo: {                      // ⬅️  reduced minimum
+      beforeYouGo: {
         type: 'array',
-        description: '3-10 key facts to know before arrival',
+        description: '1-10 key facts to know before arrival',
         items: { type: 'string' },
-        minItems: 3,  maxItems: 10
+        minItems: 1,  maxItems: 10
       },
 
       visa:    { type: 'string' },
@@ -39,14 +39,14 @@ const schema = {
 
       weather: { type: 'string' },
 
-      cultureTips: {                     // ⬅️  reduced minimum
+      cultureTips: {
         type: 'array',
         description: 'Local etiquette, dress, bargaining, etc.',
         items: { type: 'string' },
-        minItems: 5, maxItems: 15
+        minItems: 3, maxItems: 15
       },
 
-      foodList: {                        // ⬅️  reduced minimum
+      foodList: {
         type: 'array',
         description: 'Must-try dishes or restaurants with rating & source',
         items: {
@@ -59,7 +59,7 @@ const schema = {
           },
           required: ['name', 'rating', 'source']
         },
-        minItems: 5, maxItems: 20
+        minItems: 3, maxItems: 20
       },
 
       tips: { type: 'string' },
@@ -84,7 +84,7 @@ const schema = {
                 },
                 required: ['text']
               },
-              minItems: 8         // ⬅️  early morning → late night
+              minItems: 5         // ⬅️  early morning → late night
             }
           },
           required: ['date', 'title', 'steps']
@@ -137,10 +137,10 @@ export async function POST(req: Request) {
 
             REQUIREMENTS
             1. Call the function "generate_itinerary" with JSON that matches the schema.
-            2. "beforeYouGo": 3-10 key bullets (safety, SIM cards, cash, etc.).
-            3. "cultureTips": at least 5 concise etiquette tips.
-            4. "foodList": 5-20 items. Each must include rating (0-5) and rating source.
-            5. Each day must have 8+ steps covering early morning to late night with
+            2. "beforeYouGo": 1-10 key bullets (safety, SIM cards, cash, etc.).
+            3. "cultureTips": at least 3 concise etiquette tips.
+            4. "foodList": 3-20 items. Each must include rating (0-5) and rating source.
+            5. Each day must have 5+ steps covering early morning to late night with
                realistic transport modes and prices checked against 2025 data.
             6. All dates must be ISO-8601 YYYY-MM-DD format.
             7. Consider their ${form.travelVibe} vibe and ${form.interests?.join(', ')} interests.

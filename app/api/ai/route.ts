@@ -12,10 +12,8 @@ const schema = {
 
       beforeYouGo: {
         type: 'array',
-        description: '8-12 specific, actionable pre-travel tasks',
-        items: { type: 'string' },
-        minItems: 8,
-        maxItems: 12
+        description: 'Specific, actionable pre-travel tasks',
+        items: { type: 'string' }
       },
 
       visa: {
@@ -65,9 +63,7 @@ const schema = {
       cultureTips: {
         type: 'array',
         description: 'Local etiquette, dress, bargaining, etc.',
-        items: { type: 'string' },
-        minItems: 5,
-        maxItems: 15
+        items: { type: 'string' }
       },
 
       foodList: {
@@ -82,9 +78,7 @@ const schema = {
             source: { type: 'string' }
           },
           required: ['name', 'rating', 'source']
-        },
-        minItems: 5,
-        maxItems: 20
+        }
       },
 
       practicalInfo: {
@@ -141,8 +135,7 @@ const schema = {
                   cost: { type: 'string' }
                 },
                 required: ['text']
-              },
-              minItems: 5
+              }
             }
           },
           required: ['date', 'title', 'steps']
@@ -219,7 +212,7 @@ export async function POST(req: Request) {
                - Detail tipping customs with specific amounts/percentages
                - ATM availability and fees
 
-            3. BEFORE YOU GO CHECKLIST (8-12 items) - Be specific and actionable:
+            3. BEFORE YOU GO CHECKLIST - Several specific and actionable items:
                - Travel insurance requirements (mandatory vs recommended)
                - Health requirements (vaccinations, health certificates)
                - Power adapter type and voltage
@@ -250,7 +243,7 @@ export async function POST(req: Request) {
                - Photography restrictions and etiquette
 
             6. DAILY ITINERARY:
-               - Each day needs 5+ detailed steps from morning to night
+               - Each day needs detailed steps from morning to night
                - Include specific costs in local currency
                - Realistic transport options and times
                - Consider ${form.travelVibe} pace and ${form.interests} interests
@@ -258,7 +251,7 @@ export async function POST(req: Request) {
                - Account for ${form.groupType} group dynamics
 
             7. FOOD RECOMMENDATIONS:
-               - 5-20 specific dishes/restaurants with ratings and sources
+               - Several specific dishes/restaurants with ratings and sources
                - Include ${form.dietary} options where relevant
                - Mix of price points within budget
                - Local specialties and where to find them
@@ -285,7 +278,7 @@ export async function POST(req: Request) {
     // Enhanced fallback response with new structure
     const startDate = new Date(form?.dateRange?.from || new Date());
     const endDate = new Date(form?.dateRange?.to || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
-    const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 1000)));
     
     const fallbackData = {
       intro: `Welcome to your ${form?.destination || 'travel'} adventure! This comprehensive guide provides essential information for ${form?.country || 'international'} travelers. Please note: This is a fallback response - for the most current visa and travel requirements, consult official sources.`,

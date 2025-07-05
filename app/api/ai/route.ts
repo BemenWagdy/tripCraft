@@ -101,9 +101,16 @@ const schema = {
 };
 
 export async function POST(req: Request) {
+  let form;
+  
   try {
-    const form = await req.json();
-    
+    form = await req.json();
+  } catch (parseError) {
+    appendError(parseError, 'request-parsing');
+    return NextResponse.json({ error: 'Invalid request format' }, { status: 400 });
+  }
+
+  try {
     // Convert string dates to Date objects before calculating duration
     const startDate = new Date(form.dateRange.from);
     const endDate = new Date(form.dateRange.to);
@@ -167,55 +174,71 @@ export async function POST(req: Request) {
       headers: { 'Content-Type': 'application/json' }
     });
 
-  } catch (err) {
+  } catch (err: any) {
     appendError(err, 'groq-api');
     
+    // Check if it's a 503 service unavailable error
+    if (err.message?.includes('503') || err.message?.includes('Service unavailable')) {
+      console.warn('Groq API is temporarily unavailable (503). Using fallback response.');
+    }
+    
     // Enhanced fallback response with new structure
-    const form = await req.json().catch(() => ({ destination: 'Unknown', dailyBudget: 100 }));
+    const startDate = new Date(form?.dateRange?.from || new Date());
+    const endDate = new Date(form?.dateRange?.to || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
+    const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    
     const fallbackData = {
-      intro: `Welcome to your ${form.destination} adventure! This sample itinerary provides a taste of what awaits you in this incredible destination.`,
+      intro: `Welcome to your ${form?.destination || 'travel'} adventure! This sample itinerary provides a taste of what awaits you in this incredible destination. Please note: This is a fallback response due to temporary service unavailability.`,
       beforeYouGo: [
         "Check visa requirements for your nationality",
-        "Get travel insurance before departure",
-        "Notify your bank of travel plans"
+        "Get comprehensive travel insurance before departure",
+        "Notify your bank of travel plans to avoid card blocks",
+        "Research local emergency numbers and embassy contacts",
+        "Download offline maps and translation apps"
       ],
-      visa: "Check current visa requirements for your nationality before travel. Some countries offer visa-on-arrival or e-visa options.",
+      visa: "Check current visa requirements for your nationality before travel. Some countries offer visa-on-arrival or e-visa options. Visit your destination's official embassy website for the most up-to-date information.",
       currency: { code: "USD", rateUsd: 1 },
       averages: { hostel: 25, midHotel: 75, highEnd: 200 },
-      weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack accordingly for temperature and precipitation.",
+      weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack accordingly for temperature and precipitation. Consider the rainy season and extreme weather patterns.",
       cultureTips: [
-        "Learn basic greetings in the local language",
-        "Research appropriate dress codes for religious sites",
-        "Understand local tipping customs and expectations",
-        "Be aware of cultural gestures that might be offensive",
-        "Respect photography restrictions in certain areas"
+        "Learn basic greetings in the local language - locals appreciate the effort",
+        "Research appropriate dress codes for religious sites and conservative areas",
+        "Understand local tipping customs and expectations to avoid awkward situations",
+        "Be aware of cultural gestures that might be offensive in the local context",
+        "Respect photography restrictions in certain areas, especially religious sites",
+        "Learn about local dining etiquette and table manners"
       ],
       foodList: [
-        { name: "Local Street Food", note: "Try authentic street vendors", rating: 4.5, source: "TripAdvisor" },
-        { name: "Traditional Restaurant", note: "Family-run establishment", rating: 4.2, source: "Google Maps" },
-        { name: "Local Market Food", note: "Fresh ingredients and local flavors", rating: 4.0, source: "Yelp" },
-        { name: "Regional Specialty", note: "Must-try local dish", rating: 4.7, source: "Lonely Planet" },
-        { name: "Breakfast Spot", note: "Popular morning destination", rating: 4.3, source: "Google Maps" }
+        { name: "Local Street Food", note: "Try authentic street vendors for the real local experience", rating: 4.5, source: "TripAdvisor" },
+        { name: "Traditional Family Restaurant", note: "Family-run establishment with authentic recipes", rating: 4.2, source: "Google Maps" },
+        { name: "Local Market Food", note: "Fresh ingredients and local flavors at great prices", rating: 4.0, source: "Yelp" },
+        { name: "Regional Specialty Dish", note: "Must-try local dish unique to the region", rating: 4.7, source: "Lonely Planet" },
+        { name: "Popular Breakfast Spot", note: "Where locals start their day", rating: 4.3, source: "Google Maps" },
+        { name: "Night Market Food", note: "Evening food scene with variety of options", rating: 4.4, source: "TripAdvisor" }
       ],
-      tips: "Keep copies of important documents, stay aware of your surroundings, learn basic local phrases, and always have emergency contacts readily available.",
-      days: [
-        {
-          date: new Date().toISOString().split('T')[0],
-          title: "Arrival & Exploration",
-          cost: `$${form.dailyBudget || 100}`,
+      tips: "Keep copies of important documents in separate locations, stay aware of your surroundings especially in crowded areas, learn basic local phrases for emergencies, always have emergency contacts readily available, and trust your instincts if something feels unsafe.",
+      days: Array.from({ length: duration }, (_, i) => {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+        const dateStr = currentDate.toISOString().split('T')[0];
+        
+        return {
+          date: dateStr,
+          title: i === 0 ? "Arrival & First Exploration" : i === duration - 1 ? "Final Day & Departure" : `Day ${i + 1} - Local Discovery`,
+          cost: `$${form?.dailyBudget || 100}`,
           steps: [
-            { time: "08:00", text: "Arrive at airport and complete immigration", mode: "Flight", cost: "Included" },
-            { time: "10:00", text: "Take transport to accommodation", mode: "Taxi", cost: "$25" },
-            { time: "12:00", text: "Check into accommodation and freshen up", mode: "Walk", cost: "$0" },
-            { time: "14:00", text: "Lunch at nearby local restaurant", cost: "$15" },
-            { time: "16:00", text: "Explore immediate neighborhood", mode: "Walk", cost: "$0" },
-            { time: "18:00", text: "Visit main city center or landmark", mode: "Public Transit", cost: "$5" },
+            { time: "08:00", text: i === 0 ? "Arrive at airport and complete immigration" : "Start day with local breakfast", mode: i === 0 ? "Flight" : "Walk", cost: i === 0 ? "Included" : "$8" },
+            { time: "10:00", text: i === 0 ? "Take transport to accommodation" : "Visit main attraction or landmark", mode: i === 0 ? "Taxi" : "Public Transit", cost: i === 0 ? "$25" : "$12" },
+            { time: "12:00", text: i === 0 ? "Check into accommodation and freshen up" : "Lunch at local restaurant", mode: "Walk", cost: i === 0 ? "$0" : "$15" },
+            { time: "14:00", text: i === 0 ? "Lunch at nearby local restaurant" : "Explore cultural sites or museums", cost: "$15" },
+            { time: "16:00", text: i === 0 ? "Explore immediate neighborhood" : "Shopping or local market visit", mode: "Walk", cost: i === 0 ? "$0" : "$20" },
+            { time: "18:00", text: i === 0 ? "Visit main city center or landmark" : "Relax at accommodation or local café", mode: "Public Transit", cost: "$5" },
             { time: "20:00", text: "Dinner at recommended restaurant", cost: "$25" },
-            { time: "22:00", text: "Return to accommodation and rest", mode: "Public Transit", cost: "$5" }
+            { time: "22:00", text: i === duration - 1 ? "Pack and prepare for departure" : "Return to accommodation and rest", mode: "Public Transit", cost: "$5" }
           ]
-        }
-      ],
-      totalCost: `$${(form.dailyBudget || 100) * 3}`
+        };
+      }),
+      totalCost: `$${(form?.dailyBudget || 100) * duration}`
     };
 
     return NextResponse.json(fallbackData);

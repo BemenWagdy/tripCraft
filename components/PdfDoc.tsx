@@ -1,4 +1,5 @@
 /* components/PdfDoc.tsx */
+import React from 'react';
 import {
   Document, Page, View, Text, StyleSheet, Image
 } from '@react-pdf/renderer';

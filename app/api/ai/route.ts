@@ -4,36 +4,59 @@ import { NextResponse } from 'next/server';
 
 const schema = {
   name: 'generate_itinerary',
-  description: 'Return a fully-structured travel plan',
+  description: 'Return a fully-structured travel plan with specific, actionable information',
   parameters: {
     type: 'object',
     properties: {
-      intro:   { type: 'string' },
+      intro: { type: 'string' },
 
       beforeYouGo: {
         type: 'array',
-        description: '1-10 key facts to know before arrival',
+        description: '8-12 specific, actionable pre-travel tasks',
         items: { type: 'string' },
-        minItems: 1,  maxItems: 10
+        minItems: 8,
+        maxItems: 12
       },
 
-      visa:    { type: 'string' },
+      visa: {
+        type: 'object',
+        description: 'Specific visa requirements based on traveler nationality',
+        properties: {
+          required: { type: 'boolean' },
+          type: { type: 'string' }, // e.g., "Tourist visa", "Visa on arrival", "eVisa", "Visa-free"
+          applicationMethod: { type: 'string' }, // e.g., "Apply via TLScontact Cairo", "VFS Global New Delhi"
+          processingTime: { type: 'string' }, // e.g., "5-10 business days"
+          fee: { type: 'string' }, // e.g., "$60 USD (₹5,000 INR)"
+          validityPeriod: { type: 'string' }, // e.g., "90 days from entry"
+          appointmentWarning: { type: 'string' }, // e.g., "Slots fill 4-6 weeks out"
+          additionalRequirements: { 
+            type: 'array',
+            items: { type: 'string' }
+          }
+        },
+        required: ['required', 'type']
+      },
 
       currency: {
         type: 'object',
         properties: {
-          code:    { type: 'string' },
-          rateUsd: { type: 'number' }
+          destinationCode: { type: 'string' },
+          homeToDestination: { type: 'string' }, // e.g., "1 USD = 83.2 INR"
+          destinationToHome: { type: 'string' }, // e.g., "1 INR = 0.012 USD"
+          cashCulture: { type: 'string' }, // Payment preferences
+          tippingNorms: { type: 'string' },
+          atmAvailability: { type: 'string' },
+          cardAcceptance: { type: 'string' }
         },
-        required: ['code', 'rateUsd']
+        required: ['destinationCode', 'homeToDestination', 'destinationToHome']
       },
 
       averages: {
         type: 'object',
         properties: {
-          hostel:   { type: 'number' },
+          hostel: { type: 'number' },
           midHotel: { type: 'number' },
-          highEnd:  { type: 'number' }
+          highEnd: { type: 'number' }
         }
       },
 
@@ -43,7 +66,8 @@ const schema = {
         type: 'array',
         description: 'Local etiquette, dress, bargaining, etc.',
         items: { type: 'string' },
-        minItems: 3, maxItems: 15
+        minItems: 5,
+        maxItems: 15
       },
 
       foodList: {
@@ -52,14 +76,48 @@ const schema = {
         items: {
           type: 'object',
           properties: {
-            name:   { type: 'string' },
-            note:   { type: 'string' },  // "Koshari from Abou Tarek"
-            rating: { type: 'number' },  // 4.8
-            source: { type: 'string' }   // "Google Maps"
+            name: { type: 'string' },
+            note: { type: 'string' },
+            rating: { type: 'number' },
+            source: { type: 'string' }
           },
           required: ['name', 'rating', 'source']
         },
-        minItems: 3, maxItems: 20
+        minItems: 5,
+        maxItems: 20
+      },
+
+      practicalInfo: {
+        type: 'object',
+        description: 'Essential practical information',
+        properties: {
+          powerPlugType: { type: 'string' }, // e.g., "Type C & F (European), 230V"
+          simCardOptions: { 
+            type: 'array',
+            items: { type: 'string' }
+          },
+          emergencyNumbers: {
+            type: 'object',
+            properties: {
+              police: { type: 'string' },
+              medical: { type: 'string' },
+              fire: { type: 'string' },
+              tourist: { type: 'string' }
+            }
+          },
+          commonScams: {
+            type: 'array',
+            items: { type: 'string' }
+          },
+          safetyApps: {
+            type: 'array',
+            items: { type: 'string' }
+          },
+          healthRequirements: {
+            type: 'array',
+            items: { type: 'string' }
+          }
+        }
       },
 
       tips: { type: 'string' },
@@ -69,22 +127,22 @@ const schema = {
         items: {
           type: 'object',
           properties: {
-            date:  { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+            date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
             title: { type: 'string' },
-            cost:  { type: 'string' },
+            cost: { type: 'string' },
             steps: {
               type: 'array',
               items: {
                 type: 'object',
                 properties: {
-                  time: { type: 'string' },  // e.g. "06:30"
+                  time: { type: 'string' },
                   text: { type: 'string' },
                   mode: { type: 'string' },
                   cost: { type: 'string' }
                 },
                 required: ['text']
               },
-              minItems: 5         // ⬅️  early morning → late night
+              minItems: 5
             }
           },
           required: ['date', 'title', 'steps']
@@ -95,7 +153,7 @@ const schema = {
     },
     required: [
       'intro', 'beforeYouGo', 'visa', 'currency', 'weather',
-      'cultureTips', 'foodList', 'tips', 'days'
+      'cultureTips', 'foodList', 'practicalInfo', 'tips', 'days'
     ]
   }
 };
@@ -123,42 +181,89 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'system',
-          content: 'You are an expert travel planner who creates detailed, practical itineraries. Always use the generate_itinerary function to return structured data. Provide specific recommendations with estimated costs and practical tips.'
+          content: `You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.`
         },
         {
           role: 'user',
           content: `
-            Generate a detailed budget itinerary for ${form.destination}
-            • Date range: ${form.dateRange.from} to ${form.dateRange.to}
+            Generate a comprehensive, actionable travel itinerary for a ${form.country} citizen traveling to ${form.destination}
+            
+            TRAVELER PROFILE:
+            • Nationality/Passport: ${form.country}
+            • Destination: ${form.destination}
+            • Travel dates: ${form.dateRange.from} to ${form.dateRange.to} (${duration} days)
             • Daily budget: $${form.dailyBudget}
-            • Duration: ${duration} days
-            • Traveller nationality: ${form.country}
             • Group type: ${form.groupType}
-            • Travel vibe: ${form.travelVibe}
+            • Travel style: ${form.travelVibe}
             • Interests: ${form.interests?.join(', ') || 'General sightseeing'}
-            • Dietary preferences: ${form.dietary}
+            • Dietary needs: ${form.dietary}
             • Accommodation: ${form.accommodation}
-            • Transportation: ${form.transportPref}
+            • Transport preference: ${form.transportPref}
             • Special occasion: ${form.occasion}
-            • Must-see: ${form.mustSee || 'None'}
-            • Avoid: ${form.avoid || 'None'}
+            • Must-see: ${form.mustSee || 'None specified'}
+            • Avoid: ${form.avoid || 'None specified'}
 
-            REQUIREMENTS
-            1. Call the function "generate_itinerary" with JSON that matches the schema.
-            2. "beforeYouGo": 1-10 key bullets (safety, SIM cards, cash, etc.).
-            3. "cultureTips": at least 3 concise etiquette tips.
-            4. "foodList": 3-20 items. Each must include rating (0-5) and rating source.
-            5. Each day must have 5+ steps covering early morning to late night with
-               realistic transport modes and prices checked against 2025 data.
-            6. All dates must be ISO-8601 YYYY-MM-DD format.
-            7. Consider their ${form.travelVibe} vibe and ${form.interests?.join(', ')} interests.
-            8. Match their $${form.dailyBudget} daily budget and ${form.accommodation} accommodation preference.
-            9. Account for ${form.transportPref} transportation and ${form.groupType} group type.
-            10. Use their nationality (${form.country}) for visa requirements and currency information.
-            ${form.dietary && form.dietary !== 'None' ? `11. Include ${form.dietary} dining options.` : ''}
-            ${form.occasion && form.occasion !== 'None' ? `12. Add special touches for ${form.occasion}.` : ''}
-            ${form.mustSee ? `13. Include: ${form.mustSee}` : ''}
-            ${form.avoid ? `14. Avoid: ${form.avoid}` : ''}
+            CRITICAL REQUIREMENTS:
+
+            1. VISA INFORMATION - Be specific for ${form.country} citizens going to ${form.destination}:
+               - State clearly if visa required, visa-free, visa on arrival, or eVisa
+               - Provide exact application method (e.g., "Apply via VFS Global Mumbai", "TLScontact Berlin")
+               - Include processing time, fees in both currencies, validity period
+               - Warn about appointment availability if relevant
+               - List specific requirements (photos, bank statements, etc.)
+
+            2. CURRENCY & PAYMENTS - Direct exchange rates:
+               - Show ${form.country} currency to destination currency rate
+               - Show destination to ${form.country} currency rate
+               - Explain local payment culture (cash vs card preference)
+               - Detail tipping customs with specific amounts/percentages
+               - ATM availability and fees
+
+            3. BEFORE YOU GO CHECKLIST (8-12 items) - Be specific and actionable:
+               - Travel insurance requirements (mandatory vs recommended)
+               - Health requirements (vaccinations, health certificates)
+               - Power adapter type and voltage
+               - Local SIM/eSIM options with provider names
+               - Seasonal packing advice for travel dates
+               - Common scams specific to destination
+               - Safety apps and emergency numbers
+               - Banking notifications and card setup
+               - Embassy registration if recommended
+               - Proof of funds requirements
+               - Return ticket requirements
+
+            4. PRACTICAL INFO - Include:
+               - Exact power plug types and voltage
+               - Specific SIM card providers and costs
+               - Emergency numbers (police, medical, fire, tourist helpline)
+               - Common scams with prevention tips
+               - Recommended safety apps
+               - Health requirements and recommended vaccinations
+
+            5. CULTURAL TIPS - Destination-specific etiquette:
+               - Greeting customs and basic phrases
+               - Dress codes for different situations
+               - Religious site protocols
+               - Business card etiquette if relevant
+               - Dining customs and table manners
+               - Bargaining culture and techniques
+               - Photography restrictions and etiquette
+
+            6. DAILY ITINERARY:
+               - Each day needs 5+ detailed steps from morning to night
+               - Include specific costs in local currency
+               - Realistic transport options and times
+               - Consider ${form.travelVibe} pace and ${form.interests} interests
+               - Match ${form.accommodation} preference and $${form.dailyBudget} budget
+               - Account for ${form.groupType} group dynamics
+
+            7. FOOD RECOMMENDATIONS:
+               - 5-20 specific dishes/restaurants with ratings and sources
+               - Include ${form.dietary} options where relevant
+               - Mix of price points within budget
+               - Local specialties and where to find them
+
+            Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
           `
         }
       ]
@@ -177,46 +282,112 @@ export async function POST(req: Request) {
   } catch (err: any) {
     appendError(err, 'groq-api');
     
-    // Check if it's a 503 service unavailable error
-    if (err.message?.includes('503') || err.message?.includes('Service unavailable')) {
-      console.warn('Groq API is temporarily unavailable (503). Using fallback response.');
-    }
-    
     // Enhanced fallback response with new structure
     const startDate = new Date(form?.dateRange?.from || new Date());
     const endDate = new Date(form?.dateRange?.to || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
     const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
     
     const fallbackData = {
-      intro: `Welcome to your ${form?.destination || 'travel'} adventure! This sample itinerary provides a taste of what awaits you in this incredible destination. Please note: This is a fallback response due to temporary service unavailability.`,
+      intro: `Welcome to your ${form?.destination || 'travel'} adventure! This comprehensive guide provides essential information for ${form?.country || 'international'} travelers. Please note: This is a fallback response - for the most current visa and travel requirements, consult official sources.`,
+      
       beforeYouGo: [
-        "Check visa requirements for your nationality",
-        "Get comprehensive travel insurance before departure",
-        "Notify your bank of travel plans to avoid card blocks",
-        "Research local emergency numbers and embassy contacts",
-        "Download offline maps and translation apps"
+        "Check current visa requirements on official embassy website",
+        "Purchase comprehensive travel insurance with medical coverage",
+        "Notify your bank of international travel plans to prevent card blocks",
+        "Download offline maps (Google Maps, Maps.me) for navigation without data",
+        "Research local emergency numbers and save embassy contact information",
+        "Get appropriate power adapters for your electronics",
+        "Check vaccination requirements and health advisories",
+        "Set up international roaming or research local SIM card options",
+        "Make copies of important documents (passport, visa, insurance)",
+        "Research local customs and cultural etiquette",
+        "Check weather forecast and pack appropriate clothing",
+        "Arrange airport transfers or research public transport options"
       ],
-      visa: "Check current visa requirements for your nationality before travel. Some countries offer visa-on-arrival or e-visa options. Visit your destination's official embassy website for the most up-to-date information.",
-      currency: { code: "USD", rateUsd: 1 },
+
+      visa: {
+        required: true,
+        type: "Please verify current requirements",
+        applicationMethod: "Check with nearest embassy or consulate",
+        processingTime: "Varies by nationality and destination",
+        fee: "Check official embassy website for current fees",
+        validityPeriod: "Varies by visa type",
+        appointmentWarning: "Book appointments well in advance",
+        additionalRequirements: [
+          "Valid passport with 6+ months validity",
+          "Passport-sized photographs",
+          "Proof of accommodation",
+          "Return flight tickets",
+          "Bank statements showing sufficient funds"
+        ]
+      },
+
+      currency: {
+        destinationCode: "Local Currency",
+        homeToDestination: "Check current exchange rates",
+        destinationToHome: "Check current exchange rates",
+        cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
+        tippingNorms: "Research local tipping customs - varies significantly by country and service type",
+        atmAvailability: "ATMs widely available in cities, may be limited in rural areas",
+        cardAcceptance: "Credit cards accepted at most hotels and restaurants, carry cash for small vendors"
+      },
+
       averages: { hostel: 25, midHotel: 75, highEnd: 200 },
-      weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack accordingly for temperature and precipitation. Consider the rainy season and extreme weather patterns.",
+      
+      weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack layers and weather-appropriate clothing. Consider the rainy season and any extreme weather patterns typical for this time of year.",
+      
       cultureTips: [
         "Learn basic greetings in the local language - locals appreciate the effort",
-        "Research appropriate dress codes for religious sites and conservative areas",
-        "Understand local tipping customs and expectations to avoid awkward situations",
-        "Be aware of cultural gestures that might be offensive in the local context",
-        "Respect photography restrictions in certain areas, especially religious sites",
-        "Learn about local dining etiquette and table manners"
+        "Research appropriate dress codes, especially for religious sites",
+        "Understand local dining etiquette and table manners",
+        "Be aware of cultural gestures that might be considered offensive",
+        "Respect photography restrictions, especially at religious or government sites",
+        "Learn about local business hours and holiday schedules",
+        "Understand bargaining culture if applicable to your destination"
       ],
+      
       foodList: [
-        { name: "Local Street Food", note: "Try authentic street vendors for the real local experience", rating: 4.5, source: "TripAdvisor" },
-        { name: "Traditional Family Restaurant", note: "Family-run establishment with authentic recipes", rating: 4.2, source: "Google Maps" },
-        { name: "Local Market Food", note: "Fresh ingredients and local flavors at great prices", rating: 4.0, source: "Yelp" },
-        { name: "Regional Specialty Dish", note: "Must-try local dish unique to the region", rating: 4.7, source: "Lonely Planet" },
+        { name: "Local Street Food", note: "Try authentic street vendors for genuine local flavors", rating: 4.5, source: "TripAdvisor" },
+        { name: "Traditional Restaurant", note: "Family-run establishment with authentic recipes", rating: 4.2, source: "Google Maps" },
+        { name: "Local Market Food", note: "Fresh ingredients and local specialties", rating: 4.0, source: "Yelp" },
+        { name: "Regional Specialty", note: "Must-try dish unique to this region", rating: 4.7, source: "Lonely Planet" },
         { name: "Popular Breakfast Spot", note: "Where locals start their day", rating: 4.3, source: "Google Maps" },
-        { name: "Night Market Food", note: "Evening food scene with variety of options", rating: 4.4, source: "TripAdvisor" }
+        { name: "Night Market", note: "Evening food scene with variety", rating: 4.4, source: "TripAdvisor" }
       ],
-      tips: "Keep copies of important documents in separate locations, stay aware of your surroundings especially in crowded areas, learn basic local phrases for emergencies, always have emergency contacts readily available, and trust your instincts if something feels unsafe.",
+
+      practicalInfo: {
+        powerPlugType: "Check destination-specific power plug requirements",
+        simCardOptions: [
+          "Research local mobile providers",
+          "Consider international roaming plans",
+          "Look into eSIM options for compatible devices"
+        ],
+        emergencyNumbers: {
+          police: "Check local emergency numbers",
+          medical: "Research medical emergency contacts",
+          fire: "Find local fire emergency number",
+          tourist: "Look up tourist police or helpline"
+        },
+        commonScams: [
+          "Research destination-specific common tourist scams",
+          "Be wary of overly friendly strangers offering help",
+          "Verify taxi meters are running or agree on price beforehand",
+          "Be cautious with ATMs in isolated areas"
+        ],
+        safetyApps: [
+          "Download embassy app if available",
+          "Consider safety apps like bSafe or SkyAlert",
+          "Save emergency contacts in your phone"
+        ],
+        healthRequirements: [
+          "Check vaccination requirements",
+          "Research health advisories",
+          "Consider travel health insurance"
+        ]
+      },
+
+      tips: "Stay flexible with your plans, keep important documents secure, trust your instincts about safety, learn a few key phrases in the local language, and always have a backup plan for transportation and accommodation.",
+
       days: Array.from({ length: duration }, (_, i) => {
         const currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + i);
@@ -224,20 +395,21 @@ export async function POST(req: Request) {
         
         return {
           date: dateStr,
-          title: i === 0 ? "Arrival & First Exploration" : i === duration - 1 ? "Final Day & Departure" : `Day ${i + 1} - Local Discovery`,
+          title: i === 0 ? "Arrival & Orientation" : i === duration - 1 ? "Final Day & Departure" : `Day ${i + 1} - Local Exploration`,
           cost: `$${form?.dailyBudget || 100}`,
           steps: [
-            { time: "08:00", text: i === 0 ? "Arrive at airport and complete immigration" : "Start day with local breakfast", mode: i === 0 ? "Flight" : "Walk", cost: i === 0 ? "Included" : "$8" },
-            { time: "10:00", text: i === 0 ? "Take transport to accommodation" : "Visit main attraction or landmark", mode: i === 0 ? "Taxi" : "Public Transit", cost: i === 0 ? "$25" : "$12" },
-            { time: "12:00", text: i === 0 ? "Check into accommodation and freshen up" : "Lunch at local restaurant", mode: "Walk", cost: i === 0 ? "$0" : "$15" },
-            { time: "14:00", text: i === 0 ? "Lunch at nearby local restaurant" : "Explore cultural sites or museums", cost: "$15" },
-            { time: "16:00", text: i === 0 ? "Explore immediate neighborhood" : "Shopping or local market visit", mode: "Walk", cost: i === 0 ? "$0" : "$20" },
-            { time: "18:00", text: i === 0 ? "Visit main city center or landmark" : "Relax at accommodation or local café", mode: "Public Transit", cost: "$5" },
+            { time: "08:00", text: i === 0 ? "Arrive and complete immigration procedures" : "Start with local breakfast", mode: i === 0 ? "Flight" : "Walk", cost: i === 0 ? "Included" : "$8" },
+            { time: "10:00", text: i === 0 ? "Transport to accommodation" : "Visit main attraction", mode: i === 0 ? "Taxi/Transport" : "Public Transit", cost: i === 0 ? "$25" : "$12" },
+            { time: "12:00", text: i === 0 ? "Check-in and orientation" : "Lunch at local restaurant", mode: "Walk", cost: i === 0 ? "$0" : "$15" },
+            { time: "14:00", text: i === 0 ? "First local meal" : "Cultural site or museum visit", cost: "$15" },
+            { time: "16:00", text: i === 0 ? "Neighborhood exploration" : "Shopping or market visit", mode: "Walk", cost: "$10" },
+            { time: "18:00", text: "Evening activity or relaxation", mode: "Public Transit", cost: "$5" },
             { time: "20:00", text: "Dinner at recommended restaurant", cost: "$25" },
-            { time: "22:00", text: i === duration - 1 ? "Pack and prepare for departure" : "Return to accommodation and rest", mode: "Public Transit", cost: "$5" }
+            { time: "22:00", text: i === duration - 1 ? "Pack and prepare for departure" : "Return to accommodation", mode: "Walk/Transit", cost: "$5" }
           ]
         };
       }),
+
       totalCost: `$${(form?.dailyBudget || 100) * duration}`
     };
 

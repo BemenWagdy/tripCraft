@@ -31,8 +31,7 @@ const schema = {
             type: 'array',
             items: { type: 'string' }
           }
-        },
-        required: ['required', 'type']
+        }
       },
 
       currency: {

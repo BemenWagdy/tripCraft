@@ -37,7 +37,7 @@ interface StructuredData {
   dateRange: string;
   intro: string;
   visa: {
-    required: boolean;
+    required?: boolean;
     type?: string;
     applicationMethod?: string;
     processingTime?: string;
@@ -117,9 +117,9 @@ export default function PdfDoc({ data }: { data: StructuredData }) {
 
         {/* Visa Information */}
         <Text style={st.h2}>Visa Requirements</Text>
-        <View style={visa.required ? st.warningBox : st.visaBox}>
+        <View style={visa.required === true ? st.warningBox : (visa.required === false ? st.visaBox : st.infoBox)}>
           <Text style={{ ...st.p, fontFamily: 'Helvetica-Bold' }}>
-            Status: {visa.required ? 'Visa Required' : 'Visa Not Required'}
+            Status: {visa.required === true ? 'Visa Required' : (visa.required === false ? 'Visa Not Required' : 'Status Unknown')}
           </Text>
           {visa.type && <Text style={st.p}>Type: {visa.type}</Text>}
           {visa.applicationMethod && <Text style={st.p}>Apply via: {visa.applicationMethod}</Text>}

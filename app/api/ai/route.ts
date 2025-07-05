@@ -145,8 +145,7 @@ const schema = {
       totalCost: { type: 'string' }
     },
     required: [
-      'intro', 'beforeYouGo', 'visa', 'currency', 'weather',
-      'cultureTips', 'foodList', 'practicalInfo', 'tips', 'days'
+      'intro', 'visa', 'currency', 'weather', 'tips', 'days'
     ]
   }
 };

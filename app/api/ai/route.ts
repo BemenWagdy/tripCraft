@@ -12,8 +12,10 @@ const schema = {
 
       beforeYouGo: {
         type: 'array',
-        description: 'Exactly 10 specific, actionable pre-travel tasks for the destination',
-        items: { type: 'string' }
+        description: '8-10 specific, actionable pre-travel tasks for the destination',
+        items: { type: 'string' },
+        minItems: 8,
+        maxItems: 10
       },
 
       visa: {
@@ -63,7 +65,9 @@ const schema = {
       cultureTips: {
         type: 'array',
         description: '8-10 location-precise cultural etiquette tips',
-        items: { type: 'string' }
+        items: { type: 'string' },
+        minItems: 8,
+        maxItems: 10
       },
 
       foodList: {
@@ -78,7 +82,8 @@ const schema = {
             source: { type: 'string' }
           },
           required: ['name']
-        }
+        },
+        minItems: 10
       },
 
       practicalInfo: {
@@ -165,7 +170,7 @@ export async function POST(req: Request) {
 
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,
-      temperature: 0.7,
+      temperature: 0.6,
       tools: [{ type: 'function', function: schema }],
       messages: [
         {
@@ -174,7 +179,7 @@ export async function POST(req: Request) {
 When you are asked to call the function generate_itinerary you must fill every field in the schema – but with the following upgraded content rules:
 
 1 Before-You-Go checklist
-	•	Provide exactly 10 bullet items that a traveller should prepare other than visas.
+	•	Provide 8-10 bullet items that a traveller should prepare other than visas.
 	•	Make every item specific to the destination country (no global clichés).
 – Examples: local SIM brands & data prices; cash-only quirk for small cafés; mandatory travel insurance portal; seat-reservation rule on inter-city trains; seasonal clothing nuance; public-holiday closures; common taxi scams & mitigation; card–PIN length issue; tap-water safety; accepted power-plug type.
 
@@ -222,7 +227,8 @@ Add a final key footer (string) with:
 Remember:
 	•	Produce only a valid JSON object wrapped in the required tool_call.
 	•	Do not invent fields that aren't in the schema, except the new footer inside the root object.
-	•	Fail gracefully (empty string) for data you truly cannot find.`
+	•	Fail gracefully (empty string) for data you truly cannot find.
+	•	Keep responses concise but comprehensive to avoid generation limits.`
         },
         {
           role: 'user',
@@ -256,7 +262,7 @@ Remember:
                - Match ${form.accommodation} preference and $${form.dailyBudget} budget
                - Account for ${form.groupType} group dynamics
 
-            2. BEFORE YOU GO - 10 destination-specific items (not generic):
+            2. BEFORE YOU GO - 8-10 destination-specific items (not generic):
                - Local SIM card providers and data costs
                - Specific cultural customs for ${form.destination}
                - Local payment preferences and card acceptance
@@ -280,7 +286,7 @@ Remember:
                - Local payment culture and tipping customs
                - ATM availability and fees
 
-            5. FOOD RECOMMENDATIONS - 10 specific dishes/restaurants:
+            5. FOOD RECOMMENDATIONS - At least 10 specific dishes/restaurants:
                - Include ${form.dietary} options where relevant
                - Mix of price points within budget
                - Specific locations and neighborhoods

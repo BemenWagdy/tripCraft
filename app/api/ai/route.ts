@@ -31,7 +31,8 @@ const schema = {
             type: 'array',
             items: { type: 'string' }
           }
-        }
+        },
+        required: ['required', 'type']
       },
 
       currency: {
@@ -76,7 +77,7 @@ const schema = {
             rating: { type: 'number' },
             source: { type: 'string' }
           },
-          required: ['name', 'rating', 'source']
+          required: ['name']
         }
       },
 
@@ -85,18 +86,14 @@ const schema = {
         description: 'Essential practical information',
         properties: {
           powerPlugType: { type: 'string' }, // e.g., "Type C & F (European), 230V"
+          powerVoltage: { type: 'string' },
           simCardOptions: { 
             type: 'array',
             items: { type: 'string' }
           },
           emergencyNumbers: {
             type: 'object',
-            properties: {
-              police: { type: 'string' },
-              medical: { type: 'string' },
-              fire: { type: 'string' },
-              tourist: { type: 'string' }
-            }
+            additionalProperties: { type: 'string' }
           },
           commonScams: {
             type: 'array',
@@ -144,7 +141,7 @@ const schema = {
       totalCost: { type: 'string' }
     },
     required: [
-      'intro', 'visa', 'currency', 'weather', 'tips', 'days'
+      'intro', 'visa', 'currency', 'beforeYouGo', 'days'
     ]
   }
 };
@@ -172,7 +169,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'system',
-          content: `You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.`
+          content: `You are a travel-planner tool. You MUST respond **only** by invoking the function 'generate_itinerary' with JSON that validates against its schema. Do not add properties that are not in the schema. You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.`
         },
         {
           role: 'user',
@@ -266,9 +263,16 @@ export async function POST(req: Request) {
       throw new Error('No structured response from AI');
     }
 
-    return new Response(toolCall.function.arguments, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    // Enhanced error handling for JSON parsing
+    try {
+      const parsedResponse = JSON.parse(toolCall.function.arguments);
+      return new Response(JSON.stringify(parsedResponse), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (parseError) {
+      console.error('[TripCraft] JSON parsing error:', parseError);
+      throw new Error('Failed to parse AI response');
+    }
 
   } catch (err: any) {
     appendError(err, 'groq-api');
@@ -348,6 +352,7 @@ export async function POST(req: Request) {
 
       practicalInfo: {
         powerPlugType: "Check destination-specific power plug requirements",
+        powerVoltage: "Check local voltage requirements",
         simCardOptions: [
           "Research local mobile providers",
           "Consider international roaming plans",
@@ -404,6 +409,9 @@ export async function POST(req: Request) {
       totalCost: `$${(form?.dailyBudget || 100) * duration}`
     };
 
-    return NextResponse.json(fallbackData);
+    return new Response(
+      JSON.stringify({ error: 'Itinerary generation failed. Please retry.', fallback: fallbackData }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }

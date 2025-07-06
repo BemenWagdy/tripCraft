@@ -12,7 +12,7 @@ const schema = {
 
       beforeYouGo: {
         type: 'array',
-        description: 'Exactly 10 specific, actionable pre-travel tasks for the destination',
+        description: 'Specific, actionable pre-travel tasks',
         items: { type: 'string' }
       },
 
@@ -62,13 +62,13 @@ const schema = {
 
       cultureTips: {
         type: 'array',
-        description: '8-10 location-precise cultural etiquette tips',
+        description: 'Local etiquette, dress, bargaining, etc.',
         items: { type: 'string' }
       },
 
       foodList: {
         type: 'array',
-        description: 'At least 10 must-try dishes or restaurants with rating & source',
+        description: 'Must-try dishes or restaurants with rating & source',
         items: {
           type: 'object',
           properties: {
@@ -83,20 +83,21 @@ const schema = {
 
       practicalInfo: {
         type: 'object',
-        description: 'Enhanced practical information',
+        description: 'Essential practical information',
         properties: {
           powerPlugType: { type: 'string' }, // e.g., "Type C & F (European), 230V"
-          waterSafety: { type: 'string' }, // e.g., "Tap water safe in Brussels, filter advisable"
-          contactless: { type: 'string' }, // e.g., "Apple/Google Pay accepted almost everywhere"
-          sundayClosures: { type: 'string' }, // shops, supermarkets, museums
-          scamAlerts: { 
+          powerVoltage: { type: 'string' },
+          simCardOptions: { 
             type: 'array',
             items: { type: 'string' }
           },
-          simCards: { type: 'string' }, // best e-SIM & physical SIM options + price
           emergencyNumbers: {
             type: 'object',
             additionalProperties: { type: 'string' }
+          },
+          commonScams: {
+            type: 'array',
+            items: { type: 'string' }
           },
           safetyApps: {
             type: 'array',
@@ -109,7 +110,7 @@ const schema = {
         }
       },
 
-      tips: { type: 'string', description: '5-8 smart traveller hacks' },
+      tips: { type: 'string' },
 
       days: {
         type: 'array',
@@ -137,12 +138,10 @@ const schema = {
         }
       },
 
-      totalCost: { type: 'string' },
-      
-      footer: { type: 'string', description: 'Last checked date, disclaimer, and tourism site link' }
+      totalCost: { type: 'string' }
     },
     required: [
-      'intro', 'beforeYouGo', 'visa', 'currency', 'weather', 'cultureTips', 'foodList', 'practicalInfo', 'tips', 'days', 'footer'
+      'intro', 'visa', 'currency', 'beforeYouGo', 'days'
     ]
   }
 };
@@ -170,59 +169,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'system',
-          content: `You are "TripCraft Formatter v2", a specialist travel-planning agent.
-When you are asked to call the function generate_itinerary you must fill every field in the schema – but with the following upgraded content rules:
-
-1 Before-You-Go checklist
-	•	Provide exactly 10 bullet items that a traveller should prepare other than visas.
-	•	Make every item specific to the destination country (no global clichés).
-– Examples: local SIM brands & data prices; cash-only quirk for small cafés; mandatory travel insurance portal; seat-reservation rule on inter-city trains; seasonal clothing nuance; public-holiday closures; common taxi scams & mitigation; card–PIN length issue; tap-water safety; accepted power-plug type.
-
-2 Visa block
-	•	If visa.required = true, supply the current fee in destination currency, the official application channel (e.g. "TLScontact Berlin" or "VFS Global Nairobi") and realistic processing time, verified as of today.
-	•	If the traveller's nationality is visa-exempt, set required = false and give a 1-sentence explanation in type.
-
-3 Currency block
-	•	Populate both directions: homeToDestination and destinationToHome with today's live mid-market rate; no USD intermediary.
-	•	Add short notes for atmAvailability, cardAcceptance, cashCulture, tippingNorms, all tuned to the destination.
-
-4 Practical information
-
-Replace the old emergency/apps/health trio with a richer object:
-
-practicalInfo:
-  waterSafety:   string   # e.g. "Tap water safe in Brussels, filter advisable"
-  contactless:   string   # e.g. "Apple/Google Pay accepted almost everywhere"
-  sundayClosures:string   # shops, supermarkets, museums
-  scamAlerts:    string[] # 2-3 common scams + avoidance tip each
-  simCards:      string   # best e-SIM & physical SIM options + price
-
-5 Culture tips
-
-Return 8-10 location-precise tips (greetings, queue etiquette, dining pace, language quirks, public-transport etiquette, smoking zones, etc.).
-
-6 Food list
-
-foodList must contain at least 10 "must-try" dishes/drinks, each with:
-	•	name, note (what to expect or best place/neighbourhood),
-	•	rating (0-5 decimal),
-	•	source ("Google Reviews", "Michelin Guide 2025", etc.).
-
-7 Tips & tricks
-
-Write 5-8 smart "traveller hacks" (e.g. cheapest airport-city ticket machines, museum late-night free slot, unlimited-weekend rail pass, secret viewpoint).
-
-8 Footer note
-
-Add a final key footer (string) with:
-	•	"Last checked: ",
-	•	disclaimer that prices/exchange rates may change,
-	•	link text for the destination's official tourism site.
-
-Remember:
-	•	Produce only a valid JSON object wrapped in the required tool_call.
-	•	Do not invent fields that aren't in the schema, except the new footer inside the root object.
-	•	Fail gracefully (empty string) for data you truly cannot find.`
+          content: `You are a travel-planner tool. You MUST respond **only** by invoking the function 'generate_itinerary' with JSON that validates against its schema. Do not add properties that are not in the schema. You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.`
         },
         {
           role: 'user',
@@ -246,66 +193,63 @@ Remember:
 
             CRITICAL REQUIREMENTS:
 
-            1. DAILY ITINERARY - Make each day comprehensive from early morning to late evening:
-               - Start around 7:00-8:00 AM with breakfast/morning routine
-               - Include buffer time between activities (15-30 minutes)
-               - End around 10:00-11:00 PM with evening activities
-               - Each day needs detailed steps with realistic timing
+            1. VISA INFORMATION - Be specific for ${form.country} citizens going to ${form.destination}:
+               - State clearly if visa required, visa-free, visa on arrival, or eVisa
+               - Provide exact application method (e.g., "Apply via VFS Global Mumbai", "TLScontact Berlin")
+               - Include processing time, fees in both currencies, validity period
+               - Warn about appointment availability if relevant
+               - List specific requirements (photos, bank statements, etc.)
+
+            2. CURRENCY & PAYMENTS - Direct exchange rates:
+               - Show ${form.country} currency to destination currency rate
+               - Show destination to ${form.country} currency rate
+               - Explain local payment culture (cash vs card preference)
+               - Detail tipping customs with specific amounts/percentages
+               - ATM availability and fees
+
+            3. BEFORE YOU GO CHECKLIST - Several specific and actionable items:
+               - Travel insurance requirements (mandatory vs recommended)
+               - Health requirements (vaccinations, health certificates)
+               - Power adapter type and voltage
+               - Local SIM/eSIM options with provider names
+               - Seasonal packing advice for travel dates
+               - Common scams specific to destination
+               - Safety apps and emergency numbers
+               - Banking notifications and card setup
+               - Embassy registration if recommended
+               - Proof of funds requirements
+               - Return ticket requirements
+
+            4. PRACTICAL INFO - Include:
+               - Exact power plug types and voltage
+               - Specific SIM card providers and costs
+               - Emergency numbers (police, medical, fire, tourist helpline)
+               - Common scams with prevention tips
+               - Recommended safety apps
+               - Health requirements and recommended vaccinations
+
+            5. CULTURAL TIPS - Destination-specific etiquette:
+               - Greeting customs and basic phrases
+               - Dress codes for different situations
+               - Religious site protocols
+               - Business card etiquette if relevant
+               - Dining customs and table manners
+               - Bargaining culture and techniques
+               - Photography restrictions and etiquette
+
+            6. DAILY ITINERARY:
+               - Each day needs detailed steps from morning to night
                - Include specific costs in local currency
+               - Realistic transport options and times
                - Consider ${form.travelVibe} pace and ${form.interests} interests
                - Match ${form.accommodation} preference and $${form.dailyBudget} budget
                - Account for ${form.groupType} group dynamics
 
-            2. BEFORE YOU GO - 10 destination-specific items (not generic):
-               - Local SIM card providers and data costs
-               - Specific cultural customs for ${form.destination}
-               - Local payment preferences and card acceptance
-               - Transportation quirks and booking requirements
-               - Seasonal considerations for travel dates
-               - Local emergency numbers and safety apps
-               - Power adapter requirements
-               - Health and vaccination requirements
-               - Local laws and customs to be aware of
-               - Specific scam warnings and prevention
-
-            3. VISA INFORMATION - Be accurate for ${form.country} citizens going to ${form.destination}:
-               - Current 2025 requirements and fees
-               - Exact application process and locations
-               - Processing times and appointment availability
-               - Required documents and specifications
-
-            4. CURRENCY - Use current 2025 exchange rates:
-               - Direct ${form.country} currency to destination currency
-               - Reverse rate for easy calculation
-               - Local payment culture and tipping customs
-               - ATM availability and fees
-
-            5. FOOD RECOMMENDATIONS - 10 specific dishes/restaurants:
+            7. FOOD RECOMMENDATIONS:
+               - Several specific dishes/restaurants with ratings and sources
                - Include ${form.dietary} options where relevant
                - Mix of price points within budget
-               - Specific locations and neighborhoods
-               - Ratings from credible sources
-
-            6. CULTURAL TIPS - 8-10 location-specific etiquette:
-               - Greeting customs and basic phrases
-               - Dining and social customs
-               - Religious and cultural sensitivities
-               - Business and social etiquette
-               - Photography restrictions
-
-            7. PRACTICAL INFO - Enhanced details:
-               - Water safety and drinking recommendations
-               - Contactless payment acceptance
-               - Sunday/holiday closure patterns
-               - Common scams with prevention tips
-               - Best SIM card and data options
-
-            8. TIPS & TRICKS - 5-8 insider knowledge:
-               - Money-saving hacks
-               - Time-saving shortcuts
-               - Hidden gems and local secrets
-               - Transportation tips
-               - Best times to visit attractions
+               - Local specialties and where to find them
 
             Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
           `
@@ -351,7 +295,9 @@ Remember:
         "Check vaccination requirements and health advisories",
         "Set up international roaming or research local SIM card options",
         "Make copies of important documents (passport, visa, insurance)",
-        "Research local customs and cultural etiquette"
+        "Research local customs and cultural etiquette",
+        "Check weather forecast and pack appropriate clothing",
+        "Arrange airport transfers or research public transport options"
       ],
 
       visa: {
@@ -375,60 +321,59 @@ Remember:
         destinationCode: "Local Currency",
         homeToDestination: "Check current exchange rates",
         destinationToHome: "Check current exchange rates",
-        cashCulture: "Research local payment preferences",
-        tippingNorms: "Research local tipping customs",
-        atmAvailability: "ATMs widely available in cities",
-        cardAcceptance: "Credit cards accepted at most hotels and restaurants"
+        cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
+        tippingNorms: "Research local tipping customs - varies significantly by country and service type",
+        atmAvailability: "ATMs widely available in cities, may be limited in rural areas",
+        cardAcceptance: "Credit cards accepted at most hotels and restaurants, carry cash for small vendors"
       },
 
       averages: { hostel: 25, midHotel: 75, highEnd: 200 },
       
-      weather: "Check current weather conditions and seasonal patterns for your travel dates.",
+      weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack layers and weather-appropriate clothing. Consider the rainy season and any extreme weather patterns typical for this time of year.",
       
       cultureTips: [
-        "Learn basic greetings in the local language",
-        "Research appropriate dress codes for religious sites",
+        "Learn basic greetings in the local language - locals appreciate the effort",
+        "Research appropriate dress codes, especially for religious sites",
         "Understand local dining etiquette and table manners",
         "Be aware of cultural gestures that might be considered offensive",
-        "Respect photography restrictions at religious or government sites",
+        "Respect photography restrictions, especially at religious or government sites",
         "Learn about local business hours and holiday schedules",
-        "Understand bargaining culture if applicable",
-        "Research public transportation etiquette"
+        "Understand bargaining culture if applicable to your destination"
       ],
       
       foodList: [
-        { name: "Local Street Food", note: "Try authentic street vendors", rating: 4.5, source: "TripAdvisor" },
-        { name: "Traditional Restaurant", note: "Family-run establishment", rating: 4.2, source: "Google Maps" },
-        { name: "Local Market Food", note: "Fresh ingredients", rating: 4.0, source: "Yelp" },
-        { name: "Regional Specialty", note: "Must-try local dish", rating: 4.7, source: "Lonely Planet" },
+        { name: "Local Street Food", note: "Try authentic street vendors for genuine local flavors", rating: 4.5, source: "TripAdvisor" },
+        { name: "Traditional Restaurant", note: "Family-run establishment with authentic recipes", rating: 4.2, source: "Google Maps" },
+        { name: "Local Market Food", note: "Fresh ingredients and local specialties", rating: 4.0, source: "Yelp" },
+        { name: "Regional Specialty", note: "Must-try dish unique to this region", rating: 4.7, source: "Lonely Planet" },
         { name: "Popular Breakfast Spot", note: "Where locals start their day", rating: 4.3, source: "Google Maps" },
-        { name: "Night Market", note: "Evening food scene", rating: 4.4, source: "TripAdvisor" },
-        { name: "Coffee Culture", note: "Local coffee traditions", rating: 4.1, source: "Google Reviews" },
-        { name: "Dessert Specialty", note: "Traditional sweets", rating: 4.6, source: "Michelin Guide" },
-        { name: "Seafood Restaurant", note: "Fresh local catch", rating: 4.5, source: "Zomato" },
-        { name: "Vegetarian Options", note: "Plant-based local cuisine", rating: 4.2, source: "HappyCow" }
+        { name: "Night Market", note: "Evening food scene with variety", rating: 4.4, source: "TripAdvisor" }
       ],
 
       practicalInfo: {
         powerPlugType: "Check destination-specific power plug requirements",
-        waterSafety: "Research local water safety and drinking recommendations",
-        contactless: "Check contactless payment acceptance",
-        sundayClosures: "Research Sunday and holiday closure patterns",
-        scamAlerts: [
-          "Research destination-specific common tourist scams",
-          "Be wary of overly friendly strangers offering help",
-          "Verify taxi meters are running or agree on price beforehand"
+        powerVoltage: "Check local voltage requirements",
+        simCardOptions: [
+          "Research local mobile providers",
+          "Consider international roaming plans",
+          "Look into eSIM options for compatible devices"
         ],
-        simCards: "Research local mobile providers and eSIM options",
         emergencyNumbers: {
           police: "Check local emergency numbers",
           medical: "Research medical emergency contacts",
           fire: "Find local fire emergency number",
           tourist: "Look up tourist police or helpline"
         },
+        commonScams: [
+          "Research destination-specific common tourist scams",
+          "Be wary of overly friendly strangers offering help",
+          "Verify taxi meters are running or agree on price beforehand",
+          "Be cautious with ATMs in isolated areas"
+        ],
         safetyApps: [
           "Download embassy app if available",
-          "Consider safety apps like bSafe or SkyAlert"
+          "Consider safety apps like bSafe or SkyAlert",
+          "Save emergency contacts in your phone"
         ],
         healthRequirements: [
           "Check vaccination requirements",
@@ -461,9 +406,7 @@ Remember:
         };
       }),
 
-      totalCost: `$${(form?.dailyBudget || 100) * duration}`,
-      
-      footer: "Last checked: Fallback response. Disclaimer: This is a fallback itinerary. Prices and exchange rates may change. Please verify current information with official sources."
+      totalCost: `$${(form?.dailyBudget || 100) * duration}`
     };
 
     return new Response(

@@ -2,28 +2,6 @@ import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
-const tierSchema = {
-  type: 'object',
-  properties: {
-    avgPrice: { type: 'number', description: 'Average nightly price in destination currency' },
-    examples: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          price: { type: 'number' },      // nightly price for the selected dates
-          url: { type: 'string' }       // booking link
-        },
-        required: ['name', 'price']
-      },
-      minItems: 2,
-      maxItems: 2
-    }
-  },
-  required: ['avgPrice', 'examples']
-};
-
 const schema = {
   name: 'generate_itinerary',
   description: 'Return a fully-structured travel plan with specific, actionable information',
@@ -35,8 +13,7 @@ const schema = {
       beforeYouGo: {
         type: 'array',
         description: 'Specific, actionable pre-travel tasks',
-        items: { type: 'string' },
-        minItems: 10
+        items: { type: 'string' }
       },
 
       visa: {
@@ -62,26 +39,23 @@ const schema = {
         type: 'object',
         properties: {
           destinationCode: { type: 'string' },
-          lastUpdated: { type: 'string' }, // ISO date e.g. "2025-07-06"
-          homeToDestination: { type: 'string' }, // e.g., "1 EGP = 0.055 EUR"
-          destinationToHome: { type: 'string' }, // e.g., "1 EUR = 18.18 EGP"
+          homeToDestination: { type: 'string' }, // e.g., "1 USD = 83.2 INR"
+          destinationToHome: { type: 'string' }, // e.g., "1 INR = 0.012 USD"
           cashCulture: { type: 'string' }, // Payment preferences
           tippingNorms: { type: 'string' },
           atmAvailability: { type: 'string' },
           cardAcceptance: { type: 'string' }
         },
-        required: ['destinationCode', 'lastUpdated', 'homeToDestination', 'destinationToHome']
+        required: ['destinationCode', 'homeToDestination', 'destinationToHome']
       },
 
-      accommodation: {
+      averages: {
         type: 'object',
-        description: 'Typical nightly prices *for the given date-range* plus two concrete properties per tier',
         properties: {
-          hostel: tierSchema,
-          mid: tierSchema,
-          high: tierSchema
-        },
-        required: ['hostel', 'mid', 'high']
+          hostel: { type: 'number' },
+          midHotel: { type: 'number' },
+          highEnd: { type: 'number' }
+        }
       },
 
       weather: { type: 'string' },
@@ -164,18 +138,10 @@ const schema = {
         }
       },
 
-      totalCost: { type: 'string' },
-
-      footer: {
-        type: 'object',
-        properties: {
-          disclaimers: { type: 'string' }          // 3-5 lines
-        },
-        required: ['disclaimers']
-      }
+      totalCost: { type: 'string' }
     },
     required: [
-      'intro', 'visa', 'currency', 'beforeYouGo', 'accommodation', 'days', 'footer'
+      'intro', 'visa', 'currency', 'beforeYouGo', 'days'
     ]
   }
 };
@@ -195,7 +161,6 @@ export async function POST(req: Request) {
     const startDate = new Date(form.dateRange.from);
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const todayDate = new Date().toISOString().split('T')[0];
 
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,
@@ -242,7 +207,7 @@ export async function POST(req: Request) {
                - Detail tipping customs with specific amounts/percentages
                - ATM availability and fees
 
-            3. BEFORE YOU GO CHECKLIST - 10 specific and actionable items:
+            3. BEFORE YOU GO CHECKLIST - Several specific and actionable items:
                - Travel insurance requirements (mandatory vs recommended)
                - Health requirements (vaccinations, health certificates)
                - Power adapter type and voltage
@@ -253,6 +218,7 @@ export async function POST(req: Request) {
                - Banking notifications and card setup
                - Embassy registration if recommended
                - Proof of funds requirements
+               - Return ticket requirements
 
             4. PRACTICAL INFO - Include:
                - Exact power plug types and voltage
@@ -272,7 +238,7 @@ export async function POST(req: Request) {
                - Photography restrictions and etiquette
 
             6. DAILY ITINERARY:
-               - Each day needs detailed steps from early morning to late night with buffer time
+               - Each day needs detailed steps from morning to night
                - Include specific costs in local currency
                - Realistic transport options and times
                - Consider ${form.travelVibe} pace and ${form.interests} interests
@@ -280,14 +246,10 @@ export async function POST(req: Request) {
                - Account for ${form.groupType} group dynamics
 
             7. FOOD RECOMMENDATIONS:
-               - 10 specific dishes/restaurants with ratings and sources
+               - Several specific dishes/restaurants with ratings and sources
                - Include ${form.dietary} options where relevant
                - Mix of price points within budget
                - Local specialties and where to find them
-
-            8. Return two concrete hotel/hostel examples per tier, costed for the chosen dates.
-
-            9. Return a 'footer.disclaimers' string: mention that prices vary daily, all costs are per person unless noted, and rates were fetched on ${todayDate}.
 
             Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
           `
@@ -319,7 +281,6 @@ export async function POST(req: Request) {
     const startDate = new Date(form?.dateRange?.from || new Date());
     const endDate = new Date(form?.dateRange?.to || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
     const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 1000)));
-    const todayDate = new Date().toISOString().split('T')[0];
     
     const fallbackData = {
       intro: `Welcome to your ${form?.destination || 'travel'} adventure! This comprehensive guide provides essential information for ${form?.country || 'international'} travelers. Please note: This is a fallback response - for the most current visa and travel requirements, consult official sources.`,
@@ -334,7 +295,9 @@ export async function POST(req: Request) {
         "Check vaccination requirements and health advisories",
         "Set up international roaming or research local SIM card options",
         "Make copies of important documents (passport, visa, insurance)",
-        "Research local customs and cultural etiquette"
+        "Research local customs and cultural etiquette",
+        "Check weather forecast and pack appropriate clothing",
+        "Arrange airport transfers or research public transport options"
       ],
 
       visa: {
@@ -356,7 +319,6 @@ export async function POST(req: Request) {
 
       currency: {
         destinationCode: "Local Currency",
-        lastUpdated: todayDate,
         homeToDestination: "Check current exchange rates",
         destinationToHome: "Check current exchange rates",
         cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
@@ -365,29 +327,7 @@ export async function POST(req: Request) {
         cardAcceptance: "Credit cards accepted at most hotels and restaurants, carry cash for small vendors"
       },
 
-      accommodation: {
-        hostel: {
-          avgPrice: 25,
-          examples: [
-            { name: "Budget Hostel Example", price: 22 },
-            { name: "Youth Hostel Example", price: 28 }
-          ]
-        },
-        mid: {
-          avgPrice: 75,
-          examples: [
-            { name: "Mid-range Hotel Example", price: 70 },
-            { name: "Boutique Hotel Example", price: 80 }
-          ]
-        },
-        high: {
-          avgPrice: 200,
-          examples: [
-            { name: "Luxury Hotel Example", price: 180 },
-            { name: "Premium Resort Example", price: 220 }
-          ]
-        }
-      },
+      averages: { hostel: 25, midHotel: 75, highEnd: 200 },
       
       weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack layers and weather-appropriate clothing. Consider the rainy season and any extreme weather patterns typical for this time of year.",
       
@@ -407,11 +347,7 @@ export async function POST(req: Request) {
         { name: "Local Market Food", note: "Fresh ingredients and local specialties", rating: 4.0, source: "Yelp" },
         { name: "Regional Specialty", note: "Must-try dish unique to this region", rating: 4.7, source: "Lonely Planet" },
         { name: "Popular Breakfast Spot", note: "Where locals start their day", rating: 4.3, source: "Google Maps" },
-        { name: "Night Market", note: "Evening food scene with variety", rating: 4.4, source: "TripAdvisor" },
-        { name: "Fine Dining Experience", note: "Special occasion restaurant", rating: 4.6, source: "Michelin Guide" },
-        { name: "Cafe Culture", note: "Local coffee and pastry scene", rating: 4.1, source: "Foursquare" },
-        { name: "Seafood Specialty", note: "Fresh catch of the day", rating: 4.5, source: "Zomato" },
-        { name: "Vegetarian Delight", note: "Plant-based local cuisine", rating: 4.2, source: "HappyCow" }
+        { name: "Night Market", note: "Evening food scene with variety", rating: 4.4, source: "TripAdvisor" }
       ],
 
       practicalInfo: {
@@ -470,11 +406,7 @@ export async function POST(req: Request) {
         };
       }),
 
-      totalCost: `$${(form?.dailyBudget || 100) * duration}`,
-
-      footer: {
-        disclaimers: `Prices vary daily and are estimates only. All costs are per person unless noted. Exchange rates were fetched on ${todayDate}. Please verify current visa requirements and health advisories before travel. This itinerary is for planning purposes only.`
-      }
+      totalCost: `$${(form?.dailyBudget || 100) * duration}`
     };
 
     return new Response(

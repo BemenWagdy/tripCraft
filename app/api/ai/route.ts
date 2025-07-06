@@ -4,64 +4,51 @@ import { NextResponse } from 'next/server';
 
 const schema = {
   name: 'generate_itinerary',
-  description: 'Return a fully-structured travel plan',
+  description: 'Return a fully-structured travel plan with specific, actionable information',
   parameters: {
     type: 'object',
     properties: {
-      intro:  { type: 'string' },
+      intro: { type: 'string' },
 
-      /* --- visa --------------------------------------------------------- */
-      visa: {
-        type: 'object',
-        properties: {
-          required:        { type: 'boolean' },
-          type:            { type: 'string' },
-          applicationMethod:{ type: 'string' },
-          processingTime:  { type: 'string' },
-          fee:             { type: 'string' },
-          validityPeriod:  { type: 'string' },
-          appointmentWarning: { type: 'string' },
-          additionalRequirements: { 
-            type: 'array',
-            items: { type: 'string' }
-          }
-        },
-        required: ['required','type']
-      },
-
-      /* --- money -------------------------------------------------------- */
-      currency: {
-        type: 'object',
-        properties: {
-          destinationCode:     { type: 'string' },
-          homeToDestination:   { type: 'string' },
-          destinationToHome:   { type: 'string' },
-          atmAvailability:     { type: 'string' },
-          cardAcceptance:      { type: 'string' },
-          cashCulture:         { type: 'string' },
-          tippingNorms:        { type: 'string' }
-        },
-        required: ['destinationCode','homeToDestination','destinationToHome']
-      },
-
-      /* --- new blocks --------------------------------------------------- */
-      beforeYouGo: {              // exactly 10 bullets (strings)
+      beforeYouGo: {
         type: 'array',
+        description: 'Specific, actionable pre-travel tasks',
         minItems: 10,
         maxItems: 10,
         items: { type: 'string' }
       },
 
-      practicalInfo: {
+      visa: {
+        type: 'object',
+        description: 'Specific visa requirements based on traveler nationality',
+        properties: {
+          required: { type: 'boolean' },
+          type: { type: 'string' }, // e.g., "Tourist visa", "Visa on arrival", "eVisa", "Visa-free"
+          applicationMethod: { type: 'string' }, // e.g., "Apply via TLScontact Cairo", "VFS Global New Delhi"
+          processingTime: { type: 'string' }, // e.g., "5-10 business days"
+          fee: { type: 'string' }, // e.g., "$60 USD (₹5,000 INR)"
+          validityPeriod: { type: 'string' }, // e.g., "90 days from entry"
+          appointmentWarning: { type: 'string' }, // e.g., "Slots fill 4-6 weeks out"
+          additionalRequirements: { 
+            type: 'array',
+            items: { type: 'string' }
+          }
+        }
+      },
+
+      currency: {
         type: 'object',
         properties: {
-          waterSafety:   { type: 'string' },
-          contactless:   { type: 'string' },
-          sundayClosures:{ type: 'string' },
-          scamAlerts:    { type: 'array', items: { type: 'string' } },
-          simCards:      { type: 'string' }
+          destinationCode: { type: 'string' },
+          homeToDestination: { type: 'string' }, // e.g., "1 USD = 83.2 INR"
+          destinationToHome: { type: 'string' }, // e.g., "1 INR = 0.012 USD"
+          rateDate: { type: 'string' }, // ISO date—MUST be today; fetch the latest mid-market
+          cashCulture: { type: 'string' }, // Payment preferences
+          tippingNorms: { type: 'string' },
+          atmAvailability: { type: 'string' },
+          cardAcceptance: { type: 'string' }
         },
-        required: ['waterSafety','contactless','sundayClosures','scamAlerts','simCards']
+        required: ['destinationCode', 'homeToDestination', 'destinationToHome', 'rateDate']
       },
 
       averages: {
@@ -77,6 +64,7 @@ const schema = {
 
       cultureTips: {
         type: 'array',
+        description: 'Local etiquette, dress, bargaining, etc.',
         minItems: 8,
         maxItems: 10,
         items: { type: 'string' }
@@ -84,30 +72,46 @@ const schema = {
 
       foodList: {
         type: 'array',
+        description: 'Must-try dishes or restaurants with rating & source',
         minItems: 10,
         items: {
           type: 'object',
           properties: {
-            name:   { type: 'string' },
-            note:   { type: 'string' },
+            name: { type: 'string' },
+            note: { type: 'string' },
             rating: { type: 'number' },
             source: { type: 'string' }
           },
-          required: ['name','note','rating','source']
+          required: ['name', 'note', 'rating', 'source']
         }
       },
 
-      tips:       { type: 'string' },
+      practicalInfo: {
+        type: 'object',
+        description: 'Essential practical information',
+        properties: {
+          waterSafety: { type: 'string' },
+          contactless: { type: 'string' },
+          sundayClosures: { type: 'string' },
+          scamAlerts: { 
+            type: 'array',
+            items: { type: 'string' }
+          },
+          simCards: { type: 'string' }
+        },
+        required: ['waterSafety', 'contactless', 'sundayClosures', 'scamAlerts', 'simCards']
+      },
 
-      /* --- days array --------------------------------------------------- */
+      tips: { type: 'string' },
+
       days: {
         type: 'array',
         items: {
           type: 'object',
           properties: {
-            date:  { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+            date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
             title: { type: 'string' },
-            cost:  { type: 'string' },
+            cost: { type: 'string' },
             steps: {
               type: 'array',
               items: {
@@ -122,26 +126,22 @@ const schema = {
               }
             }
           },
-          required: ['date','title','steps']
+          required: ['date', 'title', 'steps']
         }
       },
 
       totalCost: { type: 'string' },
-      footer:    { type: 'string' }     // NEW
-    },
 
-    /* list all absolutely-required keys here */
+      footer: {
+        type: 'array',
+        description: 'Array of 3-10 short bullet-lines with disclaimers and practical nuggets',
+        minItems: 3,
+        maxItems: 10,
+        items: { type: 'string' }
+      }
+    },
     required: [
-      'intro',
-      'beforeYouGo',
-      'visa',
-      'currency',
-      'practicalInfo',
-      'cultureTips',
-      'foodList',
-      'tips',
-      'days',
-      'footer'
+      'intro', 'beforeYouGo', 'visa', 'currency', 'weather', 'cultureTips', 'foodList', 'practicalInfo', 'tips', 'days', 'footer'
     ]
   }
 };
@@ -164,20 +164,28 @@ export async function POST(req: Request) {
 
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,
-      temperature: 0.6,
+      temperature: 0.7,
       max_tokens: 8192,
       tools: [{ type: 'function', function: schema }],
       messages: [
         {
           role: 'system',
-          content: `You are a travel-planner tool. You MUST respond **only** by invoking the function 'generate_itinerary' with JSON that validates against its schema. Do not add properties that are not in the schema.
+          content: `You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.
 
 CRITICAL REQUIREMENTS:
 - beforeYouGo: EXACTLY 10 items (no more, no less)
 - cultureTips: 8-10 items
 - foodList: EXACTLY 10 items with all required fields (name, note, rating, source)
 - All required fields must be present
-- Keep responses concise to avoid token limits`
+- Keep responses concise to avoid token limits
+
+✔ Footer requirements  
+Return a field called **footer** that is an *array of 3-10 short bullet-lines*.  
+• The **first two bullets must be generic disclaimers**:  
+  – "All prices are per person and were last updated {{TODAY}}; they can fluctuate with season and exchange rates."  
+  – "Activities and fees may change without notice—always reconfirm before booking."  
+• The remaining bullets (up to 8) must be **country-specific practical nuggets** such as: public-holiday shop closures, local emergency number, dialing code, polite bargaining phrases, tap-water safety, or tipping hacks.  
+Keep each bullet under 120 characters.`
         },
         {
           role: 'user',
@@ -199,18 +207,67 @@ CRITICAL REQUIREMENTS:
             • Must-see: ${form.mustSee || 'None specified'}
             • Avoid: ${form.avoid || 'None specified'}
 
-            REQUIREMENTS:
+            CRITICAL REQUIREMENTS:
 
-            1. beforeYouGo: EXACTLY 10 destination-specific preparation items
-            2. visa: Accurate requirements for ${form.country} passport holders
-            3. currency: Current exchange rates and payment culture
-            4. practicalInfo: Include waterSafety, contactless, sundayClosures, scamAlerts (array), simCards
-            5. cultureTips: 8-10 location-specific etiquette tips
-            6. foodList: EXACTLY 10 must-try dishes with name, note, rating (0-5), source
-            7. days: Full daily itinerary from early morning to late evening with buffer time
-            8. footer: Last checked date and disclaimer
+            1. VISA INFORMATION - Be specific for ${form.country} citizens going to ${form.destination}:
+               - State clearly if visa required, visa-free, visa on arrival, or eVisa
+               - Provide exact application method (e.g., "Apply via VFS Global Mumbai", "TLScontact Berlin")
+               - Include processing time, fees in both currencies, validity period
+               - Warn about appointment availability if relevant
+               - List specific requirements (photos, bank statements, etc.)
 
-            Use current 2025 information. Be specific and actionable.
+            2. CURRENCY & PAYMENTS - Direct exchange rates:
+               - Show ${form.country} currency to destination currency rate
+               - Show destination to ${form.country} currency rate
+               - Include rateDate as today's date (2025-07-06)
+               - NOTE: homeToDestination and destinationToHome must use this rateDate
+               - Explain local payment culture (cash vs card preference)
+               - Detail tipping customs with specific amounts/percentages
+               - ATM availability and fees
+
+            3. BEFORE YOU GO CHECKLIST - EXACTLY 10 specific and actionable items:
+               - Travel insurance requirements (mandatory vs recommended)
+               - Health requirements (vaccinations, health certificates)
+               - Power adapter type and voltage
+               - Local SIM/eSIM options with provider names
+               - Seasonal packing advice for travel dates
+               - Common scams specific to destination
+               - Safety apps and emergency numbers
+               - Banking notifications and card setup
+               - Embassy registration if recommended
+               - Proof of funds requirements
+
+            4. PRACTICAL INFO - Include:
+               - waterSafety: Exact tap water safety information
+               - contactless: Payment method acceptance
+               - sundayClosures: Shop and service closure patterns
+               - scamAlerts: Array of common scams with prevention tips
+               - simCards: Specific SIM card providers and costs
+
+            5. CULTURAL TIPS - Destination-specific etiquette (8-10 items):
+               - Greeting customs and basic phrases
+               - Dress codes for different situations
+               - Religious site protocols
+               - Business card etiquette if relevant
+               - Dining customs and table manners
+               - Bargaining culture and techniques
+               - Photography restrictions and etiquette
+
+            6. DAILY ITINERARY:
+               - Each day needs detailed steps from morning to night
+               - Include specific costs in local currency
+               - Realistic transport options and times
+               - Consider ${form.travelVibe} pace and ${form.interests} interests
+               - Match ${form.accommodation} preference and $${form.dailyBudget} budget
+               - Account for ${form.groupType} group dynamics
+
+            7. FOOD RECOMMENDATIONS - EXACTLY 10 items:
+               - Several specific dishes/restaurants with ratings and sources
+               - Include ${form.dietary} options where relevant
+               - Mix of price points within budget
+               - Local specialties and where to find them
+
+            Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
           `
         }
       ]
@@ -222,16 +279,9 @@ CRITICAL REQUIREMENTS:
       throw new Error('No structured response from AI');
     }
 
-    // Enhanced error handling for JSON parsing
-    try {
-      const parsedResponse = JSON.parse(toolCall.function.arguments);
-      return new Response(JSON.stringify(parsedResponse), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } catch (parseError) {
-      console.error('[TripCraft] JSON parsing error:', parseError);
-      throw new Error('Failed to parse AI response');
-    }
+    return new Response(toolCall.function.arguments, {
+      headers: { 'Content-Type': 'application/json' }
+    });
 
   } catch (err: any) {
     appendError(err, 'groq-api');
@@ -278,50 +328,52 @@ CRITICAL REQUIREMENTS:
         destinationCode: "Local Currency",
         homeToDestination: "Check current exchange rates",
         destinationToHome: "Check current exchange rates",
-        cashCulture: "Research local payment preferences",
-        tippingNorms: "Research local tipping customs",
-        atmAvailability: "ATMs widely available in cities",
-        cardAcceptance: "Credit cards accepted at most hotels and restaurants"
+        rateDate: "2025-07-06",
+        cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
+        tippingNorms: "Research local tipping customs - varies significantly by country and service type",
+        atmAvailability: "ATMs widely available in cities, may be limited in rural areas",
+        cardAcceptance: "Credit cards accepted at most hotels and restaurants, carry cash for small vendors"
       },
 
       averages: { hostel: 25, midHotel: 75, highEnd: 200 },
       
-      weather: "Check current weather conditions and seasonal patterns for your travel dates.",
+      weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack layers and weather-appropriate clothing. Consider the rainy season and any extreme weather patterns typical for this time of year.",
       
       cultureTips: [
-        "Learn basic greetings in the local language",
-        "Research appropriate dress codes for religious sites",
+        "Learn basic greetings in the local language - locals appreciate the effort",
+        "Research appropriate dress codes, especially for religious sites",
         "Understand local dining etiquette and table manners",
         "Be aware of cultural gestures that might be considered offensive",
-        "Respect photography restrictions at religious or government sites",
+        "Respect photography restrictions, especially at religious or government sites",
         "Learn about local business hours and holiday schedules",
-        "Understand bargaining culture if applicable",
-        "Research public transportation etiquette"
+        "Understand bargaining culture if applicable to your destination",
+        "Research public transportation etiquette and payment methods"
       ],
       
       foodList: [
-        { name: "Local Street Food", note: "Try authentic street vendors", rating: 4.5, source: "TripAdvisor" },
-        { name: "Traditional Restaurant", note: "Family-run establishment", rating: 4.2, source: "Google Maps" },
-        { name: "Local Market Food", note: "Fresh ingredients", rating: 4.0, source: "Yelp" },
-        { name: "Regional Specialty", note: "Must-try local dish", rating: 4.7, source: "Lonely Planet" },
+        { name: "Local Street Food", note: "Try authentic street vendors for genuine local flavors", rating: 4.5, source: "TripAdvisor" },
+        { name: "Traditional Restaurant", note: "Family-run establishment with authentic recipes", rating: 4.2, source: "Google Maps" },
+        { name: "Local Market Food", note: "Fresh ingredients and local specialties", rating: 4.0, source: "Yelp" },
+        { name: "Regional Specialty", note: "Must-try dish unique to this region", rating: 4.7, source: "Lonely Planet" },
         { name: "Popular Breakfast Spot", note: "Where locals start their day", rating: 4.3, source: "Google Maps" },
-        { name: "Night Market", note: "Evening food scene", rating: 4.4, source: "TripAdvisor" },
-        { name: "Coffee Culture", note: "Local coffee traditions", rating: 4.1, source: "Google Reviews" },
-        { name: "Dessert Specialty", note: "Traditional sweets", rating: 4.6, source: "Michelin Guide" },
-        { name: "Seafood Restaurant", note: "Fresh local catch", rating: 4.5, source: "Zomato" },
-        { name: "Vegetarian Options", note: "Plant-based local cuisine", rating: 4.2, source: "HappyCow" }
+        { name: "Night Market", note: "Evening food scene with variety", rating: 4.4, source: "TripAdvisor" },
+        { name: "Coffee Culture", note: "Local coffee traditions and best cafes", rating: 4.1, source: "Google Reviews" },
+        { name: "Dessert Specialty", note: "Traditional sweets and where to find them", rating: 4.6, source: "Michelin Guide" },
+        { name: "Seafood Restaurant", note: "Fresh local catch and preparation styles", rating: 4.5, source: "Zomato" },
+        { name: "Vegetarian Options", note: "Plant-based local cuisine and restaurants", rating: 4.2, source: "HappyCow" }
       ],
 
       practicalInfo: {
-        waterSafety: "Research local water safety and drinking recommendations",
-        contactless: "Check contactless payment acceptance",
-        sundayClosures: "Research Sunday and holiday closure patterns",
+        waterSafety: "Research local water safety and drinking recommendations for your destination",
+        contactless: "Check contactless payment acceptance and mobile payment apps",
+        sundayClosures: "Research Sunday and holiday closure patterns for shops and attractions",
         scamAlerts: [
           "Research destination-specific common tourist scams",
           "Be wary of overly friendly strangers offering help",
-          "Verify taxi meters are running or agree on price beforehand"
+          "Verify taxi meters are running or agree on price beforehand",
+          "Be cautious with ATMs in isolated areas"
         ],
-        simCards: "Research local mobile providers and eSIM options"
+        simCards: "Research local mobile providers and eSIM options for data connectivity"
       },
 
       tips: "Stay flexible with your plans, keep important documents secure, trust your instincts about safety, learn a few key phrases in the local language, and always have a backup plan for transportation and accommodation.",
@@ -350,7 +402,13 @@ CRITICAL REQUIREMENTS:
 
       totalCost: `$${(form?.dailyBudget || 100) * duration}`,
       
-      footer: "Last checked: Fallback response. Disclaimer: This is a fallback itinerary. Prices and exchange rates may change. Please verify current information with official sources."
+      footer: [
+        "All prices are per person and were last updated 2025-07-06; they can fluctuate with season and exchange rates.",
+        "Activities and fees may change without notice—always reconfirm before booking.",
+        "This is a fallback response - verify current information with official sources.",
+        "Emergency services and embassy contact information should be saved before travel.",
+        "Local customs and regulations may vary - research current requirements."
+      ]
     };
 
     return NextResponse.json(fallbackData);

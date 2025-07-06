@@ -1,7 +1,7 @@
 /* components/PdfDoc.tsx */
 import React from 'react';
 import {
-  Document, Page, View, Text, StyleSheet, Image
+  Document, Page, View, Text, StyleSheet, Image, Link
 } from '@react-pdf/renderer';
 import { toDataURL } from '@/lib/qr';
 
@@ -48,6 +48,7 @@ interface StructuredData {
   };
   currency: {
     destinationCode: string;
+    lastUpdated?: string;
     homeToDestination: string;
     destinationToHome: string;
     cashCulture?: string;
@@ -55,7 +56,32 @@ interface StructuredData {
     atmAvailability?: string;
     cardAcceptance?: string;
   };
-  averages: { hostel: number; midHotel: number; highEnd: number };
+  accommodation: {
+    hostel: {
+      avgPrice: number;
+      examples: Array<{
+        name: string;
+        price: number;
+        url?: string;
+      }>;
+    };
+    mid: {
+      avgPrice: number;
+      examples: Array<{
+        name: string;
+        price: number;
+        url?: string;
+      }>;
+    };
+    high: {
+      avgPrice: number;
+      examples: Array<{
+        name: string;
+        price: number;
+        url?: string;
+      }>;
+    };
+  };
   weather: string;
   cultureTips: string[];
   foodList: Array<{
@@ -66,12 +92,10 @@ interface StructuredData {
   }>;
   practicalInfo?: {
     powerPlugType?: string;
+    powerVoltage?: string;
     simCardOptions?: string[];
     emergencyNumbers?: {
-      police?: string;
-      medical?: string;
-      fire?: string;
-      tourist?: string;
+      [key: string]: string;
     };
     commonScams?: string[];
     safetyApps?: string[];
@@ -92,12 +116,15 @@ interface StructuredData {
     }>;
   }>;
   totalCost?: string;
+  footer?: {
+    disclaimers: string;
+  };
 }
 
 export default function PdfDoc({ data }: { data: StructuredData }) {
   const {
     destination, dateRange, intro, visa, currency,
-    averages, weather, cultureTips, foodList, practicalInfo, tips, beforeYouGo, days, totalCost
+    accommodation, weather, cultureTips, foodList, practicalInfo, tips, beforeYouGo, days, totalCost, footer
   } = data;
 
   return (
@@ -146,6 +173,7 @@ export default function PdfDoc({ data }: { data: StructuredData }) {
         <View style={st.infoBox}>
           <Text style={st.p}>Exchange rate: {currency.homeToDestination}</Text>
           <Text style={st.p}>Reverse rate: {currency.destinationToHome}</Text>
+          {currency.lastUpdated && <Text style={st.p}>Last updated: {currency.lastUpdated}</Text>}
           {currency.cashCulture && <Text style={st.p}>Payment culture: {currency.cashCulture}</Text>}
           {currency.tippingNorms && <Text style={st.p}>Tipping: {currency.tippingNorms}</Text>}
           {currency.atmAvailability && <Text style={st.p}>ATMs: {currency.atmAvailability}</Text>}
@@ -157,28 +185,20 @@ export default function PdfDoc({ data }: { data: StructuredData }) {
           <>
             <Text style={st.h2}>Practical Information</Text>
             
-            {practicalInfo.powerPlugType && (
+            {(practicalInfo.powerPlugType || practicalInfo.powerVoltage) && (
               <View style={st.infoBox}>
                 <Text style={st.h3}>Power & Electronics</Text>
-                <Text style={st.p}>{practicalInfo.powerPlugType}</Text>
+                {practicalInfo.powerPlugType && <Text style={st.p}>{practicalInfo.powerPlugType}</Text>}
+                {practicalInfo.powerVoltage && <Text style={st.p}>{practicalInfo.powerVoltage}</Text>}
               </View>
             )}
 
             {practicalInfo.emergencyNumbers && (
               <View style={st.emergencyBox}>
                 <Text style={st.h3}>Emergency Numbers</Text>
-                {practicalInfo.emergencyNumbers.police && (
-                  <Text style={st.p}>Police: {practicalInfo.emergencyNumbers.police}</Text>
-                )}
-                {practicalInfo.emergencyNumbers.medical && (
-                  <Text style={st.p}>Medical: {practicalInfo.emergencyNumbers.medical}</Text>
-                )}
-                {practicalInfo.emergencyNumbers.fire && (
-                  <Text style={st.p}>Fire: {practicalInfo.emergencyNumbers.fire}</Text>
-                )}
-                {practicalInfo.emergencyNumbers.tourist && (
-                  <Text style={st.p}>Tourist: {practicalInfo.emergencyNumbers.tourist}</Text>
-                )}
+                {Object.entries(practicalInfo.emergencyNumbers).map(([key, value]) => (
+                  <Text key={key} style={st.p}>{key.charAt(0).toUpperCase() + key.slice(1)}: {value}</Text>
+                ))}
               </View>
             )}
 
@@ -225,23 +245,29 @@ export default function PdfDoc({ data }: { data: StructuredData }) {
         <Text style={st.p}>{weather}</Text>
 
         {/* Accommodation */}
-        <Text style={st.h2}>Average accommodation</Text>
-        <View style={st.tblHd}>
-          <Text style={st.cellL}>Type</Text>
-          <Text style={st.cellR}>Price / night</Text>
-        </View>
-        <View style={st.tblRow}>
-          <Text style={st.cellL}>Hostel</Text>
-          <Text style={st.cellR}>${averages.hostel}</Text>
-        </View>
-        <View style={st.tblRow}>
-          <Text style={st.cellL}>Mid-range hotel</Text>
-          <Text style={st.cellR}>${averages.midHotel}</Text>
-        </View>
-        <View style={st.tblRow}>
-          <Text style={st.cellL}>High-end hotel</Text>
-          <Text style={st.cellR}>${averages.highEnd}</Text>
-        </View>
+        <Text style={st.h2}>Average accommodation (per night)</Text>
+
+        {(['hostel','mid','high'] as const).map((tier) => {
+          const t = accommodation[tier];
+          return (
+            <View key={tier} style={{ marginBottom: 8 }}>
+              <Text style={{ ...st.p, fontFamily: 'Helvetica-Bold' }}>
+                {tier === 'mid' ? 'Mid-range hotel' : tier === 'high' ? 'High-end / boutique' : 'Hostel / budget'}
+                {`  ·  €${t.avgPrice}`}
+              </Text>
+              {t.examples.map((ex, i) => (
+                <View key={i} style={st.bullet}>
+                  <View style={st.dot} />
+                  <Text style={st.p}>
+                    {ex.name} – €{ex.price}
+                    {ex.url && `  `}
+                    {ex.url && <Link src={ex.url}>[book]</Link>}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          );
+        })}
 
         {/* Culture Tips */}
         <Text style={st.h2}>Local culture</Text>
@@ -283,6 +309,19 @@ export default function PdfDoc({ data }: { data: StructuredData }) {
           <>
             <Text style={st.h2}>Grand total</Text>
             <Text style={{ ...st.p, fontFamily: 'Helvetica-Bold' }}>{totalCost}</Text>
+          </>
+        )}
+
+        {/* Footer */}
+        {footer?.disclaimers && (
+          <>
+            <View style={{ borderTop: 1, borderColor: '#e5e7eb', marginTop: 12 }} />
+            <Text
+              style={{ ...st.p, fontSize: 8, marginTop: 4, color: '#6b7280' }}
+              render={({ pageNumber, totalPages }) =>
+                `${footer.disclaimers}  ·  Page ${pageNumber}/${totalPages}`
+              }
+            />
           </>
         )}
       </Page>

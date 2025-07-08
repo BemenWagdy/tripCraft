@@ -45,6 +45,7 @@ export const questionnaireSchema = z.object({
   transportPref: z.enum(['Public Transit','Rental Car','Private Driver','Walk/Bike']),
   occasion: z.enum(['None','Honeymoon','Anniversary','Birthday','Graduation']),
   country: z.string().min(2, 'Select your country'),
+  language: z.string().min(2, 'Select output language'),
   mustSee: z.string().optional(),
   avoid: z.string().optional(),
 });
@@ -82,6 +83,7 @@ export default function Questionnaire() {
       transportPref: 'Public Transit',
       occasion: 'None',
       country: '',
+      language: 'English',
       mustSee: '',
       avoid: '',
     },
@@ -107,6 +109,7 @@ export default function Questionnaire() {
         accommodation: values.accommodation,
         transportPref: values.transportPref,
         occasion: values.occasion,
+        language: values.language,
         mustSee: values.mustSee,
         avoid: values.avoid,
         dateRange: {
@@ -295,6 +298,58 @@ We encountered an issue generating your itinerary. Please try again later.
                         </SelectContent>
                       </Select>
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Language Selection */}
+              <FormField
+                control={methods.control}
+                name="language"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-medium flex items-center gap-2">
+                      <Globe className="h-5 w-5 text-purple-500" />
+                      Itinerary language
+                    </FormLabel>
+                    <FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose language for your itinerary…" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="English">🇺🇸 English</SelectItem>
+                          <SelectItem value="Spanish">🇪🇸 Español (Spanish)</SelectItem>
+                          <SelectItem value="French">🇫🇷 Français (French)</SelectItem>
+                          <SelectItem value="German">🇩🇪 Deutsch (German)</SelectItem>
+                          <SelectItem value="Italian">🇮🇹 Italiano (Italian)</SelectItem>
+                          <SelectItem value="Portuguese">🇵🇹 Português (Portuguese)</SelectItem>
+                          <SelectItem value="Dutch">🇳🇱 Nederlands (Dutch)</SelectItem>
+                          <SelectItem value="Russian">🇷🇺 Русский (Russian)</SelectItem>
+                          <SelectItem value="Chinese">🇨🇳 中文 (Chinese)</SelectItem>
+                          <SelectItem value="Japanese">🇯🇵 日本語 (Japanese)</SelectItem>
+                          <SelectItem value="Korean">🇰🇷 한국어 (Korean)</SelectItem>
+                          <SelectItem value="Arabic">🇸🇦 العربية (Arabic)</SelectItem>
+                          <SelectItem value="Hindi">🇮🇳 हिन्दी (Hindi)</SelectItem>
+                          <SelectItem value="Turkish">🇹🇷 Türkçe (Turkish)</SelectItem>
+                          <SelectItem value="Polish">🇵🇱 Polski (Polish)</SelectItem>
+                          <SelectItem value="Swedish">🇸🇪 Svenska (Swedish)</SelectItem>
+                          <SelectItem value="Norwegian">🇳🇴 Norsk (Norwegian)</SelectItem>
+                          <SelectItem value="Danish">🇩🇰 Dansk (Danish)</SelectItem>
+                          <SelectItem value="Finnish">🇫🇮 Suomi (Finnish)</SelectItem>
+                          <SelectItem value="Greek">🇬🇷 Ελληνικά (Greek)</SelectItem>
+                          <SelectItem value="Hebrew">🇮🇱 עברית (Hebrew)</SelectItem>
+                          <SelectItem value="Thai">🇹🇭 ไทย (Thai)</SelectItem>
+                          <SelectItem value="Vietnamese">🇻🇳 Tiếng Việt (Vietnamese)</SelectItem>
+                          <SelectItem value="Indonesian">🇮🇩 Bahasa Indonesia</SelectItem>
+                          <SelectItem value="Malay">🇲🇾 Bahasa Melayu (Malay)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      Choose the language for your travel itinerary
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

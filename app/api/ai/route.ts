@@ -190,10 +190,13 @@ export async function POST(req: Request) {
             • Accommodation: ${form.accommodation}
             • Transport preference: ${form.transportPref}
             • Special occasion: ${form.occasion}
+           • Output language: ${form.language}
             • Must-see: ${form.mustSee || 'None specified'}
             • Avoid: ${form.avoid || 'None specified'}
 
             CRITICAL REQUIREMENTS:
+
+           LANGUAGE: Generate the ENTIRE itinerary in ${form.language}. All text, descriptions, recommendations, and content must be written in ${form.language}. If ${form.language} is not English, translate all content appropriately while maintaining cultural context and local terminology.
 
             1. VISA INFORMATION - Be specific for ${form.country} citizens going to ${form.destination}:
                - State clearly if visa required, visa-free, visa on arrival, or eVisa

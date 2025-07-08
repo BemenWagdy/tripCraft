@@ -286,6 +286,12 @@ REQUIRED STRUCTURE:
 }
 
 Your reply must validate against this exact shape. You are an expert travel consultant creating detailed, actionable itineraries.`
+        }
+      ]
+    }
+    )
+  }
+}
 
 Respond only with the JSON that fulfils these rules.`
         },
@@ -342,7 +348,7 @@ Respond only with the JSON that fulfils these rules.`
     } catch (parseError: any) {
       console.error('[TripCraft] JSON parsing/validation error:', parseError);
       appendError(parseError, 'json-validation');
-      throw new Error(`Failed to parse/validate AI response: ${parseError.message}`);
+      throw new Error(\`Failed to parse/validate AI response: ${parseError.message}`);
     }
 
   } catch (err: any) {
@@ -354,7 +360,7 @@ Respond only with the JSON that fulfils these rules.`
     const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 1000)));
     
     const fallbackData = {
-      intro: `Welcome to your ${form?.destination || 'travel'} adventure! This comprehensive guide provides essential information for ${form?.country || 'international'} travelers. Please note: This is a fallback response - for the most current visa and travel requirements, consult official sources.`,
+      intro: \`Welcome to your ${form?.destination || 'travel'} adventure! This comprehensive guide provides essential information for ${form?.country || 'international'} travelers. Please note: This is a fallback response - for the most current visa and travel requirements, consult official sources.`,
       
       beforeYouGo: [
         "Check current visa requirements on official embassy website",
@@ -502,8 +508,8 @@ Respond only with the JSON that fulfils these rules.`
         
         return {
           date: dateStr,
-          title: i === 0 ? "Arrival & Orientation" : i === duration - 1 ? "Final Day & Departure" : `Day ${i + 1} - Local Exploration`,
-          cost: `$${form?.dailyBudget || 100}`,
+          title: i === 0 ? "Arrival & Orientation" : i === duration - 1 ? "Final Day & Departure" : \`Day ${i + 1} - Local Exploration`,
+          cost: \`$${form?.dailyBudget || 100}`,
           steps: [
             { time: "06:00", text: i === 0 ? "Arrive and complete immigration procedures" : "Early morning walk/exercise", mode: i === 0 ? "Flight" : "Walk", cost: i === 0 ? "Included" : "$0" },
             { time: "07:30", text: "Breakfast at local café", mode: "Walk", cost: "$8-12" },
@@ -524,7 +530,7 @@ Respond only with the JSON that fulfils these rules.`
         disclaimers: "Prices are estimates and may vary based on season, availability, and booking timing.\nAll costs are per person unless otherwise specified.\nExchange rates and local prices subject to change - verify current rates before travel."
       },
 
-      totalCost: `$${(form?.dailyBudget || 100) * duration}`
+      totalCost: \`$${(form?.dailyBudget || 100) * duration}`
     };
 
     return new Response(

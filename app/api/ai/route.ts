@@ -176,7 +176,7 @@ export async function POST(req: Request) {
         {
           role: 'user',
           content: `
-            Generate a comprehensive, actionable travel itinerary for a ${form.country} citizen traveling to ${form.destination}
+            Create a detailed travel itinerary for a ${form.country} citizen visiting ${form.destination}.
             
             TRAVELER PROFILE:
             • Nationality/Passport: ${form.country}
@@ -190,84 +190,20 @@ export async function POST(req: Request) {
             • Accommodation: ${form.accommodation}
             • Transport preference: ${form.transportPref}
             • Special occasion: ${form.occasion}
-           • Output language: ${form.language}
+            • Output language: ${form.language}
             • Must-see: ${form.mustSee || 'None specified'}
             • Avoid: ${form.avoid || 'None specified'}
 
-            CRITICAL REQUIREMENTS:
+            REQUIREMENTS:
 
-           LANGUAGE: Generate the ENTIRE itinerary in ${form.language}. All text, descriptions, recommendations, and content must be written in ${form.language}. If ${form.language} is not English, translate all content appropriately while maintaining cultural context and local terminology.
+            • Generate all content in ${form.language}
+            • Provide specific visa requirements for ${form.country} citizens
+            • Include current exchange rates and payment culture
+            • Create detailed daily schedules with times and costs
+            • Recommend local food with prices and ratings
+            • Include practical travel information and cultural tips
 
-            1. VISA INFORMATION - Be specific for ${form.country} citizens going to ${form.destination}:
-               - State clearly if visa required, visa-free, visa on arrival, or eVisa
-               - Provide exact application method (e.g., "Apply via VFS Global Mumbai", "TLScontact Berlin")
-               - Include processing time, fees in both currencies, validity period
-               - Warn about appointment availability if relevant
-               - List specific requirements (photos, bank statements, etc.)
-
-            2. CURRENCY & PAYMENTS - Direct exchange rates:
-               - Show ${form.country} currency to destination currency rate
-               - Show destination to ${form.country} currency rate
-               - Explain local payment culture (cash vs card preference)
-               - Detail tipping customs with specific amounts/percentages
-               - ATM availability and fees
-
-            3. BEFORE YOU GO CHECKLIST - Several specific and actionable items:
-               - Travel insurance requirements (mandatory vs recommended)
-               - Health requirements (vaccinations, health certificates)
-               - Power adapter type and voltage
-               - Local SIM/eSIM options with provider names
-               - Seasonal packing advice for travel dates
-               - Common scams specific to destination
-               - Safety apps and emergency numbers
-               - Banking notifications and card setup
-               - Embassy registration if recommended
-               - Proof of funds requirements
-               - Return ticket requirements
-
-            4. PRACTICAL INFO - Include:
-               - Exact power plug types and voltage
-               - Specific SIM card providers and costs
-               - Emergency numbers (police, medical, fire, tourist helpline)
-               - Common scams with prevention tips
-               - Recommended safety apps
-               - Health requirements and recommended vaccinations
-
-            5. CULTURAL TIPS - Destination-specific etiquette:
-               - Greeting customs and basic phrases
-               - Dress codes for different situations
-               - Religious site protocols
-               - Business card etiquette if relevant
-               - Dining customs and table manners
-               - Bargaining culture and techniques
-               - Photography restrictions and etiquette
-
-            6. DAILY ITINERARY:
-               - Each day needs detailed steps from early morning (6:00 AM) to late night (11:00 PM)
-               - Include specific times for each activity with realistic durations
-               - Add 15-30 minute buffer times between activities for transportation
-               - Schedule proper meal times: breakfast (7:30-8:30), lunch (12:30-1:30), dinner (7:00-8:00)
-               - Include snack breaks and rest periods
-               - Plan activities to cover maximum area efficiently with logical routing
-               - Group nearby attractions together to minimize travel time
-               - Include specific costs in local currency
-               - Realistic transport options and times
-               - Account for opening/closing times of attractions
-               - Include evening activities and nightlife options
-               - Consider ${form.travelVibe} pace and ${form.interests} interests
-               - Match ${form.accommodation} preference and $${form.dailyBudget} budget
-               - Account for ${form.groupType} group dynamics
-
-            7. FOOD RECOMMENDATIONS:
-               - Minimum 10 specific dishes/restaurants with ratings and sources
-               - Include specific pricing for each item (e.g., "$8-12", "€15", "₹200-300")
-               - Include ${form.dietary} options where relevant
-               - Mix of price points within budget
-               - Local specialties and where to find them
-               - Include street food, traditional dishes, popular restaurants, local markets, desserts, and beverages
-               - Provide variety across different meal types (breakfast, lunch, dinner, snacks)
-
-            Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
+            Use current 2025 information and provide specific, actionable details.
           `
         }
       ]

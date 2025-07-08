@@ -1,5 +1,6 @@
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
+import { generateItinerarySchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 
 const schema = {
@@ -232,36 +233,59 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'system',
-          content: `You are a travel-planner tool. You MUST respond **only** by invoking the function 'generate_itinerary' with JSON that validates against its schema.
+          content: `You are a JSON-only API. Respond with a single line of pure JSON that **validates against the generate_itinerary schema**. NEVER add comments, never wrap in markdown, never escape.
 
-Return pure JSON that exactly matches the generate_itinerary schema (no extra keys, no prose).
+CRITICAL RULES:
+• If you don't know a value, return an empty string ("") or [] – do NOT invent keys.
+• Use Western numerals for all numbers (0-9), even in Arabic text.
+• Maximum 15k tokens – truncate low-priority arrays first (foodList, cultureTips).
+• Use \\n inside strings for newlines, never raw new lines.
+• Return only the keys defined in the schema. If a section is empty, still return the key with an empty string or [].
 
-Absolute requirements:
-1. beforeYouGo → array of 10 – 12 strings (practical, country-specific; visa advice must NOT appear here).
-2. currency object must contain a lastUpdated field with today's date in YYYY-MM-DD and both directions:
-   • homeToDestination (eg "1 EGP = 0.054 EUR")
-   • destinationToHome (eg "1 EUR = 18.5 EGP")
-   Use the latest mid-market rate for the traveller's home currency, not USD.
-3. accommodation object must include exactly three arrays, each with two examples:
-
-"accommodation": {
-  "hostelExamples": [{"name": "...", "nightlyPrice": "€25"}, …],   // 2 items
-  "midExamples":    [{"name": "...", "nightlyPrice": "€60"}, …],   // 2 items
-  "highExamples":   [{"name": "...", "nightlyPrice": "€120"}, …]   // 2 items
+REQUIRED STRUCTURE:
+{
+  "intro": "",
+  "visa": {
+    "required": false,
+    "type": "",
+    "applicationMethod": "",
+    "processingTime": "",
+    "fee": "",
+    "validityPeriod": ""
+  },
+  "currency": {
+    "destinationCode": "",
+    "homeToDestination": "",
+    "destinationToHome": "",
+    "lastUpdated": "",
+    "atmAvailability": "",
+    "cardAcceptance": "",
+    "cashCulture": "",
+    "tippingNorms": ""
+  },
+  "beforeYouGo": [],
+  "accommodation": {
+    "hostelExamples": [],
+    "midExamples": [],
+    "highExamples": []
+  },
+  "days": [],
+  "foodList": [],
+  "practicalInfo": {
+    "commonScams": [],
+    "emergencyNumbers": {},
+    "powerPlugType": "",
+    "powerVoltage": "",
+    "safetyApps": []
+  },
+  "footer": {
+    "disclaimers": ""
+  },
+  "tips": "",
+  "totalCost": ""
 }
 
-Prices should correspond to the requested travel dates.
-4. footer.disclaimers → multi-line string (≥3 lines) that contains:
-   • Statement that "all prices are approximate and vary by season / availability".
-   • Note that costs are per person unless stated otherwise.
-   • A friendly reminder to double-check exchange rates and opening hours.
-
-Style reminders:
-• Arabic output is fine, but keep numbers & currency symbols European ("€120", "1 EGP = 0.054 EUR").
-• No duplicate information between sections.
-• Every required key in the schema must be present, even if some arrays are empty (use []).
-
-You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.
+Your reply must validate against this exact shape. You are an expert travel consultant creating detailed, actionable itineraries.`
 
 Respond only with the JSON that fulfils these rules.`
         },
@@ -298,7 +322,8 @@ Respond only with the JSON that fulfils these rules.`
             Use current 2025 information and provide specific, actionable details.
           `
         }
-      ]
+      ],
+      response_format: { type: 'json_object' }
     });
 
     const toolCall = completion.choices[0].message.tool_calls?.[0];
@@ -309,13 +334,15 @@ Respond only with the JSON that fulfils these rules.`
 
     // Enhanced error handling for JSON parsing
     try {
-      const parsedResponse = JSON.parse(toolCall.function.arguments);
-      return new Response(JSON.stringify(parsedResponse), {
+      const rawJson = JSON.parse(toolCall.function.arguments);
+      const validatedResponse = generateItinerarySchema.parse(rawJson);
+      return new Response(JSON.stringify(validatedResponse), {
         headers: { 'Content-Type': 'application/json' }
       });
-    } catch (parseError) {
-      console.error('[TripCraft] JSON parsing error:', parseError);
-      throw new Error('Failed to parse AI response');
+    } catch (parseError: any) {
+      console.error('[TripCraft] JSON parsing/validation error:', parseError);
+      appendError(parseError, 'json-validation');
+      throw new Error(`Failed to parse/validate AI response: ${parseError.message}`);
     }
 
   } catch (err: any) {
@@ -362,14 +389,30 @@ Respond only with the JSON that fulfils these rules.`
       },
 
       currency: {
-        destinationCode: "Local Currency",
-        homeToDestination: "Check current exchange rates",
-        destinationToHome: "Check current exchange rates",
+        destinationCode: "USD",
+        homeToDestination: "1 USD = 1 USD",
+        destinationToHome: "1 USD = 1 USD", 
+        lastUpdated: new Date().toISOString().split('T')[0],
         lastUpdated: "2025-01-08",
         cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
         tippingNorms: "Research local tipping customs - varies significantly by country and service type",
         atmAvailability: "ATMs widely available in cities, may be limited in rural areas",
         cardAcceptance: "Credit cards accepted at most hotels and restaurants, carry cash for small vendors"
+      },
+
+      accommodation: {
+        hostelExamples: [
+          { name: "Budget Hostel", nightlyPrice: "$25" },
+          { name: "Backpacker Lodge", nightlyPrice: "$30" }
+        ],
+        midExamples: [
+          { name: "Mid-range Hotel", nightlyPrice: "$75" },
+          { name: "Boutique Inn", nightlyPrice: "$85" }
+        ],
+        highExamples: [
+          { name: "Luxury Hotel", nightlyPrice: "$200" },
+          { name: "Premium Resort", nightlyPrice: "$250" }
+        ]
       },
 
       averages: { hostel: 25, midHotel: 75, highEnd: 200 },
@@ -447,6 +490,10 @@ Respond only with the JSON that fulfils these rules.`
       },
 
       tips: "Stay flexible with your plans, keep important documents secure, trust your instincts about safety, learn a few key phrases in the local language, and always have a backup plan for transportation and accommodation.",
+
+      footer: {
+        disclaimers: "All prices are approximate and vary by season and availability.\\nCosts are per person unless stated otherwise.\\nPlease double-check exchange rates and opening hours before travel."
+      },
 
       days: Array.from({ length: duration }, (_, i) => {
         const currentDate = new Date(startDate);

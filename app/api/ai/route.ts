@@ -69,6 +69,7 @@ const schema = {
       foodList: {
         type: 'array',
         description: 'Must-try dishes or restaurants with rating & source',
+        minItems: 10,
         items: {
           type: 'object',
           properties: {
@@ -246,10 +247,12 @@ export async function POST(req: Request) {
                - Account for ${form.groupType} group dynamics
 
             7. FOOD RECOMMENDATIONS:
-               - Several specific dishes/restaurants with ratings and sources
+               - Minimum 10 specific dishes/restaurants with ratings and sources
                - Include ${form.dietary} options where relevant
                - Mix of price points within budget
                - Local specialties and where to find them
+               - Include street food, traditional dishes, popular restaurants, local markets, desserts, and beverages
+               - Provide variety across different meal types (breakfast, lunch, dinner, snacks)
 
             Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
           `

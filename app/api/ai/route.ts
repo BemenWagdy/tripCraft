@@ -13,6 +13,7 @@ const schema = {
       beforeYouGo: {
         type: 'array',
         description: 'Specific, actionable pre-travel tasks',
+        minItems: 10,
         items: { type: 'string' }
       },
 
@@ -41,12 +42,13 @@ const schema = {
           destinationCode: { type: 'string' },
           homeToDestination: { type: 'string' }, // e.g., "1 USD = 83.2 INR"
           destinationToHome: { type: 'string' }, // e.g., "1 INR = 0.012 USD"
+          lastUpdated: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, // YYYY-MM-DD format
           cashCulture: { type: 'string' }, // Payment preferences
           tippingNorms: { type: 'string' },
           atmAvailability: { type: 'string' },
           cardAcceptance: { type: 'string' }
         },
-        required: ['destinationCode', 'homeToDestination', 'destinationToHome']
+        required: ['destinationCode', 'homeToDestination', 'destinationToHome', 'lastUpdated']
       },
 
       averages: {
@@ -56,6 +58,53 @@ const schema = {
           midHotel: { type: 'number' },
           highEnd: { type: 'number' }
         }
+      },
+
+      accommodation: {
+        type: 'object',
+        description: 'Accommodation examples with pricing',
+        properties: {
+          hostelExamples: {
+            type: 'array',
+            minItems: 2,
+            maxItems: 2,
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                nightlyPrice: { type: 'string' }
+              },
+              required: ['name', 'nightlyPrice']
+            }
+          },
+          midExamples: {
+            type: 'array',
+            minItems: 2,
+            maxItems: 2,
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                nightlyPrice: { type: 'string' }
+              },
+              required: ['name', 'nightlyPrice']
+            }
+          },
+          highExamples: {
+            type: 'array',
+            minItems: 2,
+            maxItems: 2,
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                nightlyPrice: { type: 'string' }
+              },
+              required: ['name', 'nightlyPrice']
+            }
+          }
+        },
+        required: ['hostelExamples', 'midExamples', 'highExamples']
       },
 
       weather: { type: 'string' },
@@ -140,10 +189,22 @@ const schema = {
         }
       },
 
+      footer: {
+        type: 'object',
+        description: 'Footer information with disclaimers',
+        properties: {
+          disclaimers: { 
+            type: 'string',
+            description: '3-line string about price variability and per-person costs'
+          }
+        },
+        required: ['disclaimers']
+      },
+
       totalCost: { type: 'string' }
     },
     required: [
-      'intro', 'visa', 'currency', 'beforeYouGo', 'days'
+      'intro', 'visa', 'currency', 'beforeYouGo', 'accommodation', 'days', 'footer'
     ]
   }
 };
@@ -171,7 +232,17 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'system',
-          content: `You are a travel-planner tool. You MUST respond **only** by invoking the function 'generate_itinerary' with JSON that validates against its schema. Do not add properties that are not in the schema. You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.`
+          content: `You are a travel-planner tool. You MUST respond **only** by invoking the function 'generate_itinerary' with JSON that validates against its schema. 
+
+CRITICAL REQUIREMENTS - ALL MUST BE INCLUDED:
+• beforeYouGo: Array of exactly 10-15 bullet strings (actionable pre-travel tasks)
+• currency.lastUpdated: String in YYYY-MM-DD format (today's date: 2025-01-08)
+• accommodation: Object with hostelExamples, midExamples, highExamples (each containing exactly 2 items with name and nightlyPrice)
+• footer.disclaimers: 3-line string about price variability and per-person costs
+
+Do not add properties that are not in the schema. You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.
+
+Return a JSON object that exactly matches the "generate_itinerary" schema. All required keys must be present.`
         },
         {
           role: 'user',
@@ -273,6 +344,7 @@ export async function POST(req: Request) {
         destinationCode: "Local Currency",
         homeToDestination: "Check current exchange rates",
         destinationToHome: "Check current exchange rates",
+        lastUpdated: "2025-01-08",
         cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
         tippingNorms: "Research local tipping customs - varies significantly by country and service type",
         atmAvailability: "ATMs widely available in cities, may be limited in rural areas",
@@ -280,6 +352,21 @@ export async function POST(req: Request) {
       },
 
       averages: { hostel: 25, midHotel: 75, highEnd: 200 },
+      
+      accommodation: {
+        hostelExamples: [
+          { name: "Budget Backpacker Hostel", nightlyPrice: "$25-35" },
+          { name: "City Center Youth Hostel", nightlyPrice: "$30-40" }
+        ],
+        midExamples: [
+          { name: "Boutique Hotel Downtown", nightlyPrice: "$75-95" },
+          { name: "Business Hotel Central", nightlyPrice: "$80-100" }
+        ],
+        highExamples: [
+          { name: "Luxury Resort & Spa", nightlyPrice: "$200-300" },
+          { name: "Five-Star City Hotel", nightlyPrice: "$250-350" }
+        ]
+      },
       
       weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack layers and weather-appropriate clothing. Consider the rainy season and any extreme weather patterns typical for this time of year.",
       
@@ -364,6 +451,10 @@ export async function POST(req: Request) {
           ]
         };
       }),
+
+      footer: {
+        disclaimers: "Prices are estimates and may vary based on season, availability, and booking timing.\nAll costs are per person unless otherwise specified.\nExchange rates and local prices subject to change - verify current rates before travel."
+      },
 
       totalCost: `$${(form?.dailyBudget || 100) * duration}`
     };

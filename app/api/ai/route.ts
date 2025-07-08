@@ -75,6 +75,7 @@ const schema = {
           properties: {
             name: { type: 'string' },
             note: { type: 'string' },
+            price: { type: 'string' },
             rating: { type: 'number' },
             source: { type: 'string' }
           },
@@ -239,15 +240,24 @@ export async function POST(req: Request) {
                - Photography restrictions and etiquette
 
             6. DAILY ITINERARY:
-               - Each day needs detailed steps from morning to night
+               - Each day needs detailed steps from early morning (6:00 AM) to late night (11:00 PM)
+               - Include specific times for each activity with realistic durations
+               - Add 15-30 minute buffer times between activities for transportation
+               - Schedule proper meal times: breakfast (7:30-8:30), lunch (12:30-1:30), dinner (7:00-8:00)
+               - Include snack breaks and rest periods
+               - Plan activities to cover maximum area efficiently with logical routing
+               - Group nearby attractions together to minimize travel time
                - Include specific costs in local currency
                - Realistic transport options and times
+               - Account for opening/closing times of attractions
+               - Include evening activities and nightlife options
                - Consider ${form.travelVibe} pace and ${form.interests} interests
                - Match ${form.accommodation} preference and $${form.dailyBudget} budget
                - Account for ${form.groupType} group dynamics
 
             7. FOOD RECOMMENDATIONS:
                - Minimum 10 specific dishes/restaurants with ratings and sources
+               - Include specific pricing for each item (e.g., "$8-12", "€15", "₹200-300")
                - Include ${form.dietary} options where relevant
                - Mix of price points within budget
                - Local specialties and where to find them
@@ -345,12 +355,16 @@ export async function POST(req: Request) {
       ],
       
       foodList: [
-        { name: "Local Street Food", note: "Try authentic street vendors for genuine local flavors", rating: 4.5, source: "TripAdvisor" },
-        { name: "Traditional Restaurant", note: "Family-run establishment with authentic recipes", rating: 4.2, source: "Google Maps" },
-        { name: "Local Market Food", note: "Fresh ingredients and local specialties", rating: 4.0, source: "Yelp" },
-        { name: "Regional Specialty", note: "Must-try dish unique to this region", rating: 4.7, source: "Lonely Planet" },
-        { name: "Popular Breakfast Spot", note: "Where locals start their day", rating: 4.3, source: "Google Maps" },
-        { name: "Night Market", note: "Evening food scene with variety", rating: 4.4, source: "TripAdvisor" }
+        { name: "Local Street Food", note: "Try authentic street vendors for genuine local flavors", price: "$3-8", rating: 4.5, source: "TripAdvisor" },
+        { name: "Traditional Restaurant", note: "Family-run establishment with authentic recipes", price: "$15-25", rating: 4.2, source: "Google Maps" },
+        { name: "Local Market Food", note: "Fresh ingredients and local specialties", price: "$5-10", rating: 4.0, source: "Yelp" },
+        { name: "Regional Specialty", note: "Must-try dish unique to this region", price: "$12-18", rating: 4.7, source: "Lonely Planet" },
+        { name: "Popular Breakfast Spot", note: "Where locals start their day", price: "$8-12", rating: 4.3, source: "Google Maps" },
+        { name: "Night Market", note: "Evening food scene with variety", price: "$6-15", rating: 4.4, source: "TripAdvisor" },
+        { name: "Local Coffee Shop", note: "Traditional coffee and pastries", price: "$4-8", rating: 4.1, source: "Foursquare" },
+        { name: "Seafood Restaurant", note: "Fresh catch of the day", price: "$20-35", rating: 4.6, source: "Zomato" },
+        { name: "Dessert Parlor", note: "Traditional sweets and desserts", price: "$5-12", rating: 4.4, source: "TripAdvisor" },
+        { name: "Local Brewery/Bar", note: "Craft drinks and local atmosphere", price: "$8-15", rating: 4.2, source: "Google Maps" }
       ],
 
       practicalInfo: {
@@ -397,14 +411,17 @@ export async function POST(req: Request) {
           title: i === 0 ? "Arrival & Orientation" : i === duration - 1 ? "Final Day & Departure" : `Day ${i + 1} - Local Exploration`,
           cost: `$${form?.dailyBudget || 100}`,
           steps: [
-            { time: "08:00", text: i === 0 ? "Arrive and complete immigration procedures" : "Start with local breakfast", mode: i === 0 ? "Flight" : "Walk", cost: i === 0 ? "Included" : "$8" },
-            { time: "10:00", text: i === 0 ? "Transport to accommodation" : "Visit main attraction", mode: i === 0 ? "Taxi/Transport" : "Public Transit", cost: i === 0 ? "$25" : "$12" },
-            { time: "12:00", text: i === 0 ? "Check-in and orientation" : "Lunch at local restaurant", mode: "Walk", cost: i === 0 ? "$0" : "$15" },
-            { time: "14:00", text: i === 0 ? "First local meal" : "Cultural site or museum visit", cost: "$15" },
-            { time: "16:00", text: i === 0 ? "Neighborhood exploration" : "Shopping or market visit", mode: "Walk", cost: "$10" },
-            { time: "18:00", text: "Evening activity or relaxation", mode: "Public Transit", cost: "$5" },
-            { time: "20:00", text: "Dinner at recommended restaurant", cost: "$25" },
-            { time: "22:00", text: i === duration - 1 ? "Pack and prepare for departure" : "Return to accommodation", mode: "Walk/Transit", cost: "$5" }
+            { time: "06:00", text: i === 0 ? "Arrive and complete immigration procedures" : "Early morning walk/exercise", mode: i === 0 ? "Flight" : "Walk", cost: i === 0 ? "Included" : "$0" },
+            { time: "07:30", text: "Breakfast at local café", mode: "Walk", cost: "$8-12" },
+            { time: "09:00", text: i === 0 ? "Transport to accommodation and check-in" : "Visit main attraction", mode: i === 0 ? "Taxi/Transport" : "Public Transit", cost: i === 0 ? "$25" : "$15" },
+            { time: "11:30", text: "Coffee break and rest", mode: "Walk", cost: "$5" },
+            { time: "12:30", text: "Lunch at local restaurant", mode: "Walk", cost: "$15-20" },
+            { time: "14:00", text: i === 0 ? "Neighborhood exploration" : "Cultural site or museum visit", mode: "Walk", cost: "$12" },
+            { time: "16:00", text: "Shopping or market visit", mode: "Public Transit", cost: "$10" },
+            { time: "17:30", text: "Snack and refreshment break", mode: "Walk", cost: "$6" },
+            { time: "19:00", text: "Dinner at recommended restaurant", mode: "Walk/Transit", cost: "$25-35" },
+            { time: "21:00", text: i === duration - 1 ? "Pack and prepare for departure" : "Evening entertainment or nightlife", mode: "Walk/Transit", cost: "$15" },
+            { time: "23:00", text: "Return to accommodation", mode: "Walk/Transit", cost: "$8" }
           ]
         };
       }),

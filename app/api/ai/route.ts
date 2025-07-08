@@ -1,6 +1,5 @@
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
-import { generateItinerarySchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 
 const schema = {
@@ -14,7 +13,6 @@ const schema = {
       beforeYouGo: {
         type: 'array',
         description: 'Specific, actionable pre-travel tasks',
-        minItems: 10,
         items: { type: 'string' }
       },
 
@@ -43,13 +41,12 @@ const schema = {
           destinationCode: { type: 'string' },
           homeToDestination: { type: 'string' }, // e.g., "1 USD = 83.2 INR"
           destinationToHome: { type: 'string' }, // e.g., "1 INR = 0.012 USD"
-          lastUpdated: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, // YYYY-MM-DD format
           cashCulture: { type: 'string' }, // Payment preferences
           tippingNorms: { type: 'string' },
           atmAvailability: { type: 'string' },
           cardAcceptance: { type: 'string' }
         },
-        required: ['destinationCode', 'homeToDestination', 'destinationToHome', 'lastUpdated']
+        required: ['destinationCode', 'homeToDestination', 'destinationToHome']
       },
 
       averages: {
@@ -59,53 +56,6 @@ const schema = {
           midHotel: { type: 'number' },
           highEnd: { type: 'number' }
         }
-      },
-
-      accommodation: {
-        type: 'object',
-        description: 'Accommodation examples with pricing',
-        properties: {
-          hostelExamples: {
-            type: 'array',
-            minItems: 2,
-            maxItems: 2,
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-                nightlyPrice: { type: 'string' }
-              },
-              required: ['name', 'nightlyPrice']
-            }
-          },
-          midExamples: {
-            type: 'array',
-            minItems: 2,
-            maxItems: 2,
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-                nightlyPrice: { type: 'string' }
-              },
-              required: ['name', 'nightlyPrice']
-            }
-          },
-          highExamples: {
-            type: 'array',
-            minItems: 2,
-            maxItems: 2,
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-                nightlyPrice: { type: 'string' }
-              },
-              required: ['name', 'nightlyPrice']
-            }
-          }
-        },
-        required: ['hostelExamples', 'midExamples', 'highExamples']
       },
 
       weather: { type: 'string' },
@@ -190,22 +140,10 @@ const schema = {
         }
       },
 
-      footer: {
-        type: 'object',
-        description: 'Footer information with disclaimers',
-        properties: {
-          disclaimers: { 
-            type: 'string',
-            description: '3-line string about price variability and per-person costs'
-          }
-        },
-        required: ['disclaimers']
-      },
-
       totalCost: { type: 'string' }
     },
     required: [
-      'intro', 'visa', 'currency', 'beforeYouGo', 'accommodation', 'days', 'footer'
+      'intro', 'visa', 'currency', 'beforeYouGo', 'days'
     ]
   }
 };
@@ -233,72 +171,12 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'system',
-          content: `You are a JSON-only API. Respond with a single line of pure JSON that **validates against the generate_itinerary schema**. NEVER add comments, never wrap in markdown, never escape.
-
-CRITICAL RULES:
-• If you don't know a value, return an empty string ("") or [] – do NOT invent keys.
-• Use Western numerals for all numbers (0-9), even in Arabic text.
-• Maximum 15k tokens – truncate low-priority arrays first (foodList, cultureTips).
-• Use \\n inside strings for newlines, never raw new lines.
-• Return only the keys defined in the schema. If a section is empty, still return the key with an empty string or [].
-
-REQUIRED STRUCTURE:
-{
-  "intro": "",
-  "visa": {
-    "required": false,
-    "type": "",
-    "applicationMethod": "",
-    "processingTime": "",
-    "fee": "",
-    "validityPeriod": ""
-  },
-  "currency": {
-    "destinationCode": "",
-    "homeToDestination": "",
-    "destinationToHome": "",
-    "lastUpdated": "",
-    "atmAvailability": "",
-    "cardAcceptance": "",
-    "cashCulture": "",
-    "tippingNorms": ""
-  },
-  "beforeYouGo": [],
-  "accommodation": {
-    "hostelExamples": [],
-    "midExamples": [],
-    "highExamples": []
-  },
-  "days": [],
-  "foodList": [],
-  "practicalInfo": {
-    "commonScams": [],
-    "emergencyNumbers": {},
-    "powerPlugType": "",
-    "powerVoltage": "",
-    "safetyApps": []
-  },
-  "footer": {
-    "disclaimers": ""
-  },
-  "tips": "",
-  "totalCost": ""
-}
-
-Your reply must validate against this exact shape. You are an expert travel consultant creating detailed, actionable itineraries.`
-        }
-      ]
-    }
-    )
-  }
-}
-
-Respond only with the JSON that fulfils these rules.`
+          content: `You are a travel-planner tool. You MUST respond **only** by invoking the function 'generate_itinerary' with JSON that validates against its schema. Do not add properties that are not in the schema. You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.`
         },
         {
           role: 'user',
           content: `
-            Create a detailed travel itinerary for a ${form.country} citizen visiting ${form.destination}.
+            Generate a comprehensive, actionable travel itinerary for a ${form.country} citizen traveling to ${form.destination}
             
             TRAVELER PROFILE:
             • Nationality/Passport: ${form.country}
@@ -312,24 +190,84 @@ Respond only with the JSON that fulfils these rules.`
             • Accommodation: ${form.accommodation}
             • Transport preference: ${form.transportPref}
             • Special occasion: ${form.occasion}
-            • Output language: ${form.language}
             • Must-see: ${form.mustSee || 'None specified'}
             • Avoid: ${form.avoid || 'None specified'}
 
-            REQUIREMENTS:
+            CRITICAL REQUIREMENTS:
 
-            • Generate all content in ${form.language}
-            • Provide specific visa requirements for ${form.country} citizens
-            • Include current exchange rates and payment culture
-            • Create detailed daily schedules with times and costs
-            • Recommend local food with prices and ratings
-            • Include practical travel information and cultural tips
+            1. VISA INFORMATION - Be specific for ${form.country} citizens going to ${form.destination}:
+               - State clearly if visa required, visa-free, visa on arrival, or eVisa
+               - Provide exact application method (e.g., "Apply via VFS Global Mumbai", "TLScontact Berlin")
+               - Include processing time, fees in both currencies, validity period
+               - Warn about appointment availability if relevant
+               - List specific requirements (photos, bank statements, etc.)
 
-            Use current 2025 information and provide specific, actionable details.
+            2. CURRENCY & PAYMENTS - Direct exchange rates:
+               - Show ${form.country} currency to destination currency rate
+               - Show destination to ${form.country} currency rate
+               - Explain local payment culture (cash vs card preference)
+               - Detail tipping customs with specific amounts/percentages
+               - ATM availability and fees
+
+            3. BEFORE YOU GO CHECKLIST - Several specific and actionable items:
+               - Travel insurance requirements (mandatory vs recommended)
+               - Health requirements (vaccinations, health certificates)
+               - Power adapter type and voltage
+               - Local SIM/eSIM options with provider names
+               - Seasonal packing advice for travel dates
+               - Common scams specific to destination
+               - Safety apps and emergency numbers
+               - Banking notifications and card setup
+               - Embassy registration if recommended
+               - Proof of funds requirements
+               - Return ticket requirements
+
+            4. PRACTICAL INFO - Include:
+               - Exact power plug types and voltage
+               - Specific SIM card providers and costs
+               - Emergency numbers (police, medical, fire, tourist helpline)
+               - Common scams with prevention tips
+               - Recommended safety apps
+               - Health requirements and recommended vaccinations
+
+            5. CULTURAL TIPS - Destination-specific etiquette:
+               - Greeting customs and basic phrases
+               - Dress codes for different situations
+               - Religious site protocols
+               - Business card etiquette if relevant
+               - Dining customs and table manners
+               - Bargaining culture and techniques
+               - Photography restrictions and etiquette
+
+            6. DAILY ITINERARY:
+               - Each day needs detailed steps from early morning (6:00 AM) to late night (11:00 PM)
+               - Include specific times for each activity with realistic durations
+               - Add 15-30 minute buffer times between activities for transportation
+               - Schedule proper meal times: breakfast (7:30-8:30), lunch (12:30-1:30), dinner (7:00-8:00)
+               - Include snack breaks and rest periods
+               - Plan activities to cover maximum area efficiently with logical routing
+               - Group nearby attractions together to minimize travel time
+               - Include specific costs in local currency
+               - Realistic transport options and times
+               - Account for opening/closing times of attractions
+               - Include evening activities and nightlife options
+               - Consider ${form.travelVibe} pace and ${form.interests} interests
+               - Match ${form.accommodation} preference and $${form.dailyBudget} budget
+               - Account for ${form.groupType} group dynamics
+
+            7. FOOD RECOMMENDATIONS:
+               - Minimum 10 specific dishes/restaurants with ratings and sources
+               - Include specific pricing for each item (e.g., "$8-12", "€15", "₹200-300")
+               - Include ${form.dietary} options where relevant
+               - Mix of price points within budget
+               - Local specialties and where to find them
+               - Include street food, traditional dishes, popular restaurants, local markets, desserts, and beverages
+               - Provide variety across different meal types (breakfast, lunch, dinner, snacks)
+
+            Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
           `
         }
-      ],
-      response_format: { type: 'json_object' }
+      ]
     });
 
     const toolCall = completion.choices[0].message.tool_calls?.[0];
@@ -340,15 +278,13 @@ Respond only with the JSON that fulfils these rules.`
 
     // Enhanced error handling for JSON parsing
     try {
-      const rawJson = JSON.parse(toolCall.function.arguments);
-      const validatedResponse = generateItinerarySchema.parse(rawJson);
-      return new Response(JSON.stringify(validatedResponse), {
+      const parsedResponse = JSON.parse(toolCall.function.arguments);
+      return new Response(JSON.stringify(parsedResponse), {
         headers: { 'Content-Type': 'application/json' }
       });
-    } catch (parseError: any) {
-      console.error('[TripCraft] JSON parsing/validation error:', parseError);
-      appendError(parseError, 'json-validation');
-      throw new Error(\`Failed to parse/validate AI response: ${parseError.message}`);
+    } catch (parseError) {
+      console.error('[TripCraft] JSON parsing error:', parseError);
+      throw new Error('Failed to parse AI response');
     }
 
   } catch (err: any) {
@@ -360,7 +296,7 @@ Respond only with the JSON that fulfils these rules.`
     const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 1000)));
     
     const fallbackData = {
-      intro: \`Welcome to your ${form?.destination || 'travel'} adventure! This comprehensive guide provides essential information for ${form?.country || 'international'} travelers. Please note: This is a fallback response - for the most current visa and travel requirements, consult official sources.`,
+      intro: `Welcome to your ${form?.destination || 'travel'} adventure! This comprehensive guide provides essential information for ${form?.country || 'international'} travelers. Please note: This is a fallback response - for the most current visa and travel requirements, consult official sources.`,
       
       beforeYouGo: [
         "Check current visa requirements on official embassy website",
@@ -395,48 +331,16 @@ Respond only with the JSON that fulfils these rules.`
       },
 
       currency: {
-        destinationCode: "USD",
-        homeToDestination: "1 USD = 1 USD",
-        destinationToHome: "1 USD = 1 USD", 
-        lastUpdated: new Date().toISOString().split('T')[0],
-        lastUpdated: "2025-01-08",
+        destinationCode: "Local Currency",
+        homeToDestination: "Check current exchange rates",
+        destinationToHome: "Check current exchange rates",
         cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
         tippingNorms: "Research local tipping customs - varies significantly by country and service type",
         atmAvailability: "ATMs widely available in cities, may be limited in rural areas",
         cardAcceptance: "Credit cards accepted at most hotels and restaurants, carry cash for small vendors"
       },
 
-      accommodation: {
-        hostelExamples: [
-          { name: "Budget Hostel", nightlyPrice: "$25" },
-          { name: "Backpacker Lodge", nightlyPrice: "$30" }
-        ],
-        midExamples: [
-          { name: "Mid-range Hotel", nightlyPrice: "$75" },
-          { name: "Boutique Inn", nightlyPrice: "$85" }
-        ],
-        highExamples: [
-          { name: "Luxury Hotel", nightlyPrice: "$200" },
-          { name: "Premium Resort", nightlyPrice: "$250" }
-        ]
-      },
-
       averages: { hostel: 25, midHotel: 75, highEnd: 200 },
-      
-      accommodation: {
-        hostelExamples: [
-          { name: "Budget Backpacker Hostel", nightlyPrice: "$25-35" },
-          { name: "City Center Youth Hostel", nightlyPrice: "$30-40" }
-        ],
-        midExamples: [
-          { name: "Boutique Hotel Downtown", nightlyPrice: "$75-95" },
-          { name: "Business Hotel Central", nightlyPrice: "$80-100" }
-        ],
-        highExamples: [
-          { name: "Luxury Resort & Spa", nightlyPrice: "$200-300" },
-          { name: "Five-Star City Hotel", nightlyPrice: "$250-350" }
-        ]
-      },
       
       weather: "Check current weather conditions and seasonal patterns for your travel dates. Pack layers and weather-appropriate clothing. Consider the rainy season and any extreme weather patterns typical for this time of year.",
       
@@ -497,10 +401,6 @@ Respond only with the JSON that fulfils these rules.`
 
       tips: "Stay flexible with your plans, keep important documents secure, trust your instincts about safety, learn a few key phrases in the local language, and always have a backup plan for transportation and accommodation.",
 
-      footer: {
-        disclaimers: "All prices are approximate and vary by season and availability.\\nCosts are per person unless stated otherwise.\\nPlease double-check exchange rates and opening hours before travel."
-      },
-
       days: Array.from({ length: duration }, (_, i) => {
         const currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + i);
@@ -508,8 +408,8 @@ Respond only with the JSON that fulfils these rules.`
         
         return {
           date: dateStr,
-          title: i === 0 ? "Arrival & Orientation" : i === duration - 1 ? "Final Day & Departure" : \`Day ${i + 1} - Local Exploration`,
-          cost: \`$${form?.dailyBudget || 100}`,
+          title: i === 0 ? "Arrival & Orientation" : i === duration - 1 ? "Final Day & Departure" : `Day ${i + 1} - Local Exploration`,
+          cost: `$${form?.dailyBudget || 100}`,
           steps: [
             { time: "06:00", text: i === 0 ? "Arrive and complete immigration procedures" : "Early morning walk/exercise", mode: i === 0 ? "Flight" : "Walk", cost: i === 0 ? "Included" : "$0" },
             { time: "07:30", text: "Breakfast at local café", mode: "Walk", cost: "$8-12" },
@@ -526,11 +426,7 @@ Respond only with the JSON that fulfils these rules.`
         };
       }),
 
-      footer: {
-        disclaimers: "Prices are estimates and may vary based on season, availability, and booking timing.\nAll costs are per person unless otherwise specified.\nExchange rates and local prices subject to change - verify current rates before travel."
-      },
-
-      totalCost: \`$${(form?.dailyBudget || 100) * duration}`
+      totalCost: `$${(form?.dailyBudget || 100) * duration}`
     };
 
     return new Response(

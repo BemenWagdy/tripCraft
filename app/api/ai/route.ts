@@ -240,17 +240,24 @@ export async function POST(req: Request) {
                - Photography restrictions and etiquette
 
             6. DAILY ITINERARY:
-               - Each day needs detailed steps from early morning (6:00 AM) to late night (11:00 PM)
-               - Include specific times for each activity with realistic durations
-               - Add 15-30 minute buffer times between activities for transportation
-               - Schedule proper meal times: breakfast (7:30-8:30), lunch (12:30-1:30), dinner (7:00-8:00)
-               - Include snack breaks and rest periods
-               - Plan activities to cover maximum area efficiently with logical routing
-               - Group nearby attractions together to minimize travel time
+               - Each day must be COMPLETELY FILLED from 5:30 AM to 11:30 PM with detailed activities
+               - NO hotel check-ins, NO airport arrivals - focus purely on exploration and experiences
+               - Include 15+ activities per day with specific times and durations
+               - Add detailed transportation instructions between each location
+               - Schedule strategic meal times: breakfast (7:00-8:00), mid-morning snack (10:30), lunch (12:30-1:30), afternoon snack (3:30), dinner (7:30-8:30), late night snack (10:00)
+               - Include multiple rest periods, photo stops, and exploration time
+               - Plan activities to cover MAXIMUM area with efficient routing
+               - Group nearby attractions but include diverse experiences throughout the day
+               - Include morning markets, cultural sites, museums, parks, shopping areas, local neighborhoods, viewpoints, entertainment venues
+               - Add specific walking routes, scenic paths, and local transportation tips
+               - Include both indoor and outdoor activities for weather flexibility
+               - Add local experiences like cooking classes, workshops, guided tours
+               - Include evening entertainment, nightlife, sunset spots, and late-night food scenes
                - Include specific costs in local currency
                - Realistic transport options and times
-               - Account for opening/closing times of attractions
-               - Include evening activities and nightlife options
+               - Account for opening/closing times and plan backup activities
+               - Include detailed descriptions of what to do at each location
+               - Add tips for each activity (best photo spots, what to look for, local customs)
                - Consider ${form.travelVibe} pace and ${form.interests} interests
                - Match ${form.accommodation} preference and $${form.dailyBudget} budget
                - Account for ${form.groupType} group dynamics
@@ -411,17 +418,23 @@ export async function POST(req: Request) {
           title: i === 0 ? "Arrival & Orientation" : i === duration - 1 ? "Final Day & Departure" : `Day ${i + 1} - Local Exploration`,
           cost: `$${form?.dailyBudget || 100}`,
           steps: [
-            { time: "06:00", text: i === 0 ? "Arrive and complete immigration procedures" : "Early morning walk/exercise", mode: i === 0 ? "Flight" : "Walk", cost: i === 0 ? "Included" : "$0" },
-            { time: "07:30", text: "Breakfast at local café", mode: "Walk", cost: "$8-12" },
-            { time: "09:00", text: i === 0 ? "Transport to accommodation and check-in" : "Visit main attraction", mode: i === 0 ? "Taxi/Transport" : "Public Transit", cost: i === 0 ? "$25" : "$15" },
-            { time: "11:30", text: "Coffee break and rest", mode: "Walk", cost: "$5" },
-            { time: "12:30", text: "Lunch at local restaurant", mode: "Walk", cost: "$15-20" },
-            { time: "14:00", text: i === 0 ? "Neighborhood exploration" : "Cultural site or museum visit", mode: "Walk", cost: "$12" },
-            { time: "16:00", text: "Shopping or market visit", mode: "Public Transit", cost: "$10" },
-            { time: "17:30", text: "Snack and refreshment break", mode: "Walk", cost: "$6" },
-            { time: "19:00", text: "Dinner at recommended restaurant", mode: "Walk/Transit", cost: "$25-35" },
-            { time: "21:00", text: i === duration - 1 ? "Pack and prepare for departure" : "Evening entertainment or nightlife", mode: "Walk/Transit", cost: "$15" },
-            { time: "23:00", text: "Return to accommodation", mode: "Walk/Transit", cost: "$8" }
+            { time: "05:30", text: "Early morning sunrise viewing at scenic viewpoint", mode: "Walk", cost: "$0" },
+            { time: "06:30", text: "Morning exercise or jog in local park", mode: "Walk", cost: "$0" },
+            { time: "07:00", text: "Traditional breakfast at local café with regional specialties", mode: "Walk", cost: "$8-12" },
+            { time: "08:30", text: "Visit morning market and interact with local vendors", mode: "Walk", cost: "$5" },
+            { time: "09:30", text: "Explore historic district and architectural landmarks", mode: "Walk", cost: "$0" },
+            { time: "10:30", text: "Coffee break and local pastry tasting", mode: "Walk", cost: "$6" },
+            { time: "11:00", text: "Visit main cultural attraction or museum", mode: "Public Transit", cost: "$15" },
+            { time: "12:30", text: "Lunch at authentic local restaurant", mode: "Walk", cost: "$15-20" },
+            { time: "14:00", text: "Guided walking tour of traditional neighborhood", mode: "Walk", cost: "$12" },
+            { time: "15:30", text: "Visit local artisan workshops or craft centers", mode: "Walk", cost: "$8" },
+            { time: "16:30", text: "Afternoon snack and refreshment break", mode: "Walk", cost: "$5" },
+            { time: "17:00", text: "Shopping at local markets and souvenir hunting", mode: "Walk", cost: "$20" },
+            { time: "18:30", text: "Sunset viewing from popular viewpoint", mode: "Public Transit", cost: "$3" },
+            { time: "19:30", text: "Dinner at highly-rated local restaurant", mode: "Walk", cost: "$25-35" },
+            { time: "21:00", text: "Evening entertainment - live music, cultural show, or nightlife", mode: "Walk/Transit", cost: "$15-25" },
+            { time: "22:30", text: "Late night food tour or dessert tasting", mode: "Walk", cost: "$10" },
+            { time: "23:30", text: "Return to accommodation via scenic route", mode: "Walk/Transit", cost: "$5" }
           ]
         };
       }),

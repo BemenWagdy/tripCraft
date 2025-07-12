@@ -1,152 +1,8 @@
-import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
-
-const schema = {
-  name: 'generate_itinerary',
-  description: 'Return a fully-structured travel plan with specific, actionable information',
-  parameters: {
-    type: 'object',
-    properties: {
-      intro: { type: 'string' },
-
-      beforeYouGo: {
-        type: 'array',
-        description: 'Specific, actionable pre-travel tasks',
-        items: { type: 'string' }
-      },
-
-      visa: {
-        type: 'object',
-        description: 'Specific visa requirements based on traveler nationality',
-        properties: {
-          required: { type: 'boolean' },
-          type: { type: 'string' }, // e.g., "Tourist visa", "Visa on arrival", "eVisa", "Visa-free"
-          applicationMethod: { type: 'string' }, // e.g., "Apply via TLScontact Cairo", "VFS Global New Delhi"
-          processingTime: { type: 'string' }, // e.g., "5-10 business days"
-          fee: { type: 'string' }, // e.g., "$60 USD (₹5,000 INR)"
-          validityPeriod: { type: 'string' }, // e.g., "90 days from entry"
-          appointmentWarning: { type: 'string' }, // e.g., "Slots fill 4-6 weeks out"
-          additionalRequirements: { 
-            type: 'array',
-            items: { type: 'string' }
-          }
-        },
-        required: ['required', 'type']
-      },
-
-      currency: {
-        type: 'object',
-        properties: {
-          destinationCode: { type: 'string' },
-          homeToDestination: { type: 'string' }, // e.g., "1 USD = 83.2 INR"
-          destinationToHome: { type: 'string' }, // e.g., "1 INR = 0.012 USD"
-          cashCulture: { type: 'string' }, // Payment preferences
-          tippingNorms: { type: 'string' },
-          atmAvailability: { type: 'string' },
-          cardAcceptance: { type: 'string' }
-        },
-        required: ['destinationCode', 'homeToDestination', 'destinationToHome']
-      },
-
-      averages: {
-        type: 'object',
-        properties: {
-          hostel: { type: 'number' },
-          midHotel: { type: 'number' },
-          highEnd: { type: 'number' }
-        }
-      },
-
-      weather: { type: 'string' },
-
-      cultureTips: {
-        type: 'array',
-        description: 'Local etiquette, dress, bargaining, etc.',
-        items: { type: 'string' }
-      },
-
-      foodList: {
-        type: 'array',
-        description: 'Must-try dishes or restaurants with rating & source',
-        minItems: 10,
-        items: {
-          type: 'object',
-          properties: {
-            name: { type: 'string' },
-            note: { type: 'string' },
-            price: { type: 'string' },
-            rating: { type: 'number' },
-            source: { type: 'string' }
-          },
-          required: ['name']
-        }
-      },
-
-      practicalInfo: {
-        type: 'object',
-        description: 'Essential practical information',
-        properties: {
-          powerPlugType: { type: 'string' }, // e.g., "Type C & F (European), 230V"
-          powerVoltage: { type: 'string' },
-          simCardOptions: { 
-            type: 'array',
-            items: { type: 'string' }
-          },
-          emergencyNumbers: {
-            type: 'object',
-            additionalProperties: { type: 'string' }
-          },
-          commonScams: {
-            type: 'array',
-            items: { type: 'string' }
-          },
-          safetyApps: {
-            type: 'array',
-            items: { type: 'string' }
-          },
-          healthRequirements: {
-            type: 'array',
-            items: { type: 'string' }
-          }
-        }
-      },
-
-      tips: { type: 'string' },
-
-      days: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
-            title: { type: 'string' },
-            cost: { type: 'string' },
-            steps: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  time: { type: 'string' },
-                  text: { type: 'string' },
-                  mode: { type: 'string' },
-                  cost: { type: 'string' }
-                },
-                required: ['text']
-              }
-            }
-          },
-          required: ['date', 'title', 'steps']
-        }
-      },
-
-      totalCost: { type: 'string' }
-    },
-    required: [
-      'intro', 'visa', 'currency', 'beforeYouGo', 'days'
-    ]
-  }
-};
+import { callGroq } from '@/lib/callGroq';
+import { generateMapLink } from '@/lib/qr';
+import type { MetaBlock, Day, ExtrasBlock } from '@/lib/groqSchema';
 
 export async function POST(req: Request) {
   let form;
@@ -164,133 +20,58 @@ export async function POST(req: Request) {
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    const completion = await groq.chat.completions.create({
-      model: GROQ_MODEL,
-      temperature: 0.7,
-      tools: [{ type: 'function', function: schema }],
-      messages: [
-        {
-          role: 'system',
-          content: `You are a travel-planner tool. You MUST respond **only** by invoking the function 'generate_itinerary' with JSON that validates against its schema. Do not add properties that are not in the schema. You are an expert travel consultant with deep knowledge of visa requirements, currency exchange, local customs, and practical travel information. Create detailed, actionable itineraries with specific information based on the traveler's nationality and destination. Always use current 2025 data and be specific about application processes, fees, and requirements.`
-        },
-        {
-          role: 'user',
-          content: `
-            Generate a comprehensive, actionable travel itinerary for a ${form.country} citizen traveling to ${form.destination}
-            
-            TRAVELER PROFILE:
-            • Nationality/Passport: ${form.country}
-            • Destination: ${form.destination}
-            • Travel dates: ${form.dateRange.from} to ${form.dateRange.to} (${duration} days)
-            • Daily budget: $${form.dailyBudget}
-            • Group type: ${form.groupType}
-            • Travel style: ${form.travelVibe}
-            • Interests: ${form.interests?.join(', ') || 'General sightseeing'}
-            • Dietary needs: ${form.dietary}
-            • Accommodation: ${form.accommodation}
-            • Transport preference: ${form.transportPref}
-            • Special occasion: ${form.occasion}
-            • Must-see: ${form.mustSee || 'None specified'}
-            • Avoid: ${form.avoid || 'None specified'}
+    // 1️⃣ Meta & practical blocks
+    const metaRes = await callGroq('meta', form, duration);
+    const meta = metaRes.data as MetaBlock;
 
-            CRITICAL REQUIREMENTS:
-
-            1. VISA INFORMATION - Be specific for ${form.country} citizens going to ${form.destination}:
-               - State clearly if visa required, visa-free, visa on arrival, or eVisa
-               - Provide exact application method (e.g., "Apply via VFS Global Mumbai", "TLScontact Berlin")
-               - Include processing time, fees in both currencies, validity period
-               - Warn about appointment availability if relevant
-               - List specific requirements (photos, bank statements, etc.)
-
-            2. CURRENCY & PAYMENTS - Direct exchange rates:
-               - Show ${form.country} currency to destination currency rate
-               - Show destination to ${form.country} currency rate
-               - Explain local payment culture (cash vs card preference)
-               - Detail tipping customs with specific amounts/percentages
-               - ATM availability and fees
-
-            3. BEFORE YOU GO CHECKLIST - Several specific and actionable items:
-               - Travel insurance requirements (mandatory vs recommended)
-               - Health requirements (vaccinations, health certificates)
-               - Power adapter type and voltage
-               - Local SIM/eSIM options with provider names
-               - Seasonal packing advice for travel dates
-               - Common scams specific to destination
-               - Safety apps and emergency numbers
-               - Banking notifications and card setup
-               - Embassy registration if recommended
-               - Proof of funds requirements
-               - Return ticket requirements
-
-            4. PRACTICAL INFO - Include:
-               - Exact power plug types and voltage
-               - Specific SIM card providers and costs
-               - Emergency numbers (police, medical, fire, tourist helpline)
-               - Common scams with prevention tips
-               - Recommended safety apps
-               - Health requirements and recommended vaccinations
-
-            5. CULTURAL TIPS - Destination-specific etiquette:
-               - Greeting customs and basic phrases
-               - Dress codes for different situations
-               - Religious site protocols
-               - Business card etiquette if relevant
-               - Dining customs and table manners
-               - Bargaining culture and techniques
-               - Photography restrictions and etiquette
-
-            6. DAILY ITINERARY:
-               - Each day needs detailed steps from early morning (6:00 AM) to late night (11:00 PM)
-               - Include specific times for each activity with realistic durations
-               - Add 15-30 minute buffer times between activities for transportation
-               - Schedule proper meal times: breakfast (7:30-8:30), lunch (12:30-1:30), dinner (7:00-8:00)
-               - Include snack breaks and rest periods
-               - Plan activities to cover maximum area efficiently with logical routing
-               - Group nearby attractions together to minimize travel time
-               - Include specific costs in local currency
-               - Realistic transport options and times
-               - Account for opening/closing times of attractions
-               - Include evening activities and nightlife options
-               - Consider ${form.travelVibe} pace and ${form.interests} interests
-               - Match ${form.accommodation} preference and $${form.dailyBudget} budget
-               - Account for ${form.groupType} group dynamics
-
-            7. FOOD RECOMMENDATIONS:
-               - Minimum 10 specific dishes/restaurants with ratings and sources
-               - Include specific pricing for each item (e.g., "$8-12", "€15", "₹200-300")
-               - Include ${form.dietary} options where relevant
-               - Mix of price points within budget
-               - Local specialties and where to find them
-               - Include street food, traditional dishes, popular restaurants, local markets, desserts, and beverages
-               - Provide variety across different meal types (breakfast, lunch, dinner, snacks)
-
-            Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
-          `
-        }
-      ]
-    });
-
-    const toolCall = completion.choices[0].message.tool_calls?.[0];
+    // 2️⃣ Day blocks, 5 days per cursor page
+    let cursor = 0;
+    let allDays: Day[] = [];
     
-    if (!toolCall?.function.arguments) {
-      throw new Error('No structured response from AI');
-    }
+    do {
+      const daysRes = await callGroq('days', form, duration, cursor, meta);
+      const daysData = daysRes.data as { days: Day[]; nextCursor: number | null };
+      allDays.push(...daysData.days);
+      cursor = daysData.nextCursor ?? -1; // Use -1 to break the loop when null
+    } while (cursor !== -1 && allDays.length < duration);
 
-    // Enhanced error handling for JSON parsing
-    try {
-      const parsedResponse = JSON.parse(toolCall.function.arguments);
-      return new Response(JSON.stringify(parsedResponse), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } catch (parseError) {
-      console.error('[TripCraft] JSON parsing error:', parseError);
-      throw new Error('Failed to parse AI response');
-    }
+    // 3️⃣ Food list, tips, footer, etc.
+    const extrasRes = await callGroq('extras', form, duration, 0, meta);
+    const extras = extrasRes.data as ExtrasBlock;
+
+    // Add map links to each step
+    const enhancedDays = allDays.map(day => ({
+      ...day,
+      steps: day.steps?.map(step => ({
+        ...step,
+        mapLink: generateMapLink(`${step.text} ${form.destination}`)
+      }))
+    }));
+
+    const itinerary = {
+      ...meta,
+      destination: form.destination,
+      dateRange: new Date().toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
+      }) + ' – ' + new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
+      }),
+      days: enhancedDays,
+      ...extras
+    };
+
+    return new Response(JSON.stringify(itinerary), {
+      headers: { 'Content-Type': 'application/json' }
+    });
 
   } catch (err: any) {
     appendError(err, 'groq-api');
     
-    // Enhanced fallback response with new structure
+    // Enhanced fallback response
     const startDate = new Date(form?.dateRange?.from || new Date());
     const endDate = new Date(form?.dateRange?.to || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
     const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 1000)));
@@ -424,6 +205,17 @@ export async function POST(req: Request) {
             { time: "23:00", text: "Return to accommodation", mode: "Walk/Transit", cost: "$8" }
           ]
         };
+      }),
+
+      destination: form?.destination || 'Unknown Destination',
+      dateRange: startDate.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
+      }) + ' – ' + endDate.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
       }),
 
       totalCost: `$${(form?.dailyBudget || 100) * duration}`

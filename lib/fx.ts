@@ -1,17 +1,17 @@
 // lib/fx.ts
 // -----------------------------------------------------------------------------
-// THOROUGHLY TESTED: Using reliable APIs with extensive debugging
+// SIMPLIFIED: Using only Fixer.io with API key for reliable exchange rates
 // Target rates: 1 EGP ≈ 0.074 AED, 1 AED ≈ 13.46 EGP
 // -----------------------------------------------------------------------------
 
 export interface FxResult {
   rate: number;   // price of 1 unit of base expressed in quote
   date: string;   // YYYY-MM-DD  (UTC)
-  provider: 'fixer' | 'currencylayer' | 'exchangerate' | 'fallback';
+  provider: 'fixer' | 'fallback';
 }
 
 /**
- * Fetch live FX. Guaranteed to resolve.
+ * Fetch live FX from Fixer.io only. Guaranteed to resolve.
  * @param from ISO-4217 code – e.g. "EGP"
  * @param to   ISO-4217 code – e.g. "AED"
  */
@@ -27,43 +27,34 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
     return { rate: 1, date: today(), provider: 'fallback' };
   }
 
-  // Try multiple APIs in sequence
-  const apis = [
-    () => getFromFixerIo(base, quote),
-    () => getFromExchangeRateHost(base, quote),
-    () => getFromCurrencyAPI(base, quote)
-  ];
-
-  for (let i = 0; i < apis.length; i++) {
-    console.log(`[FX] Trying API ${i + 1}...`);
-    try {
-      const result = await apis[i]();
-      if (result) {
-        console.log(`[FX] SUCCESS with API ${i + 1}: 1 ${base} = ${result.rate} ${quote}`);
-        
-        // Validate the rate makes sense for EGP/AED
-        if (base === 'EGP' && quote === 'AED') {
-          if (result.rate < 0.05 || result.rate > 0.15) {
-            console.warn(`[FX] EGP->AED rate ${result.rate} seems wrong, expected ~0.074`);
-            continue; // Try next API
-          }
+  // Try Fixer.io with API key
+  try {
+    const result = await getFromFixerIo(base, quote);
+    if (result) {
+      console.log(`[FX] SUCCESS with Fixer.io: 1 ${base} = ${result.rate} ${quote}`);
+      
+      // Validate the rate makes sense for EGP/AED
+      if (base === 'EGP' && quote === 'AED') {
+        if (result.rate < 0.05 || result.rate > 0.15) {
+          console.warn(`[FX] EGP->AED rate ${result.rate} seems wrong, expected ~0.074`);
+          throw new Error(`Invalid EGP->AED rate: ${result.rate}`);
         }
-        if (base === 'AED' && quote === 'EGP') {
-          if (result.rate < 10 || result.rate > 20) {
-            console.warn(`[FX] AED->EGP rate ${result.rate} seems wrong, expected ~13.46`);
-            continue; // Try next API
-          }
-        }
-        
-        return result;
       }
-    } catch (error) {
-      console.error(`[FX] API ${i + 1} failed:`, error);
+      if (base === 'AED' && quote === 'EGP') {
+        if (result.rate < 10 || result.rate > 20) {
+          console.warn(`[FX] AED->EGP rate ${result.rate} seems wrong, expected ~13.46`);
+          throw new Error(`Invalid AED->EGP rate: ${result.rate}`);
+        }
+      }
+      
+      return result;
     }
+  } catch (error) {
+    console.error(`[FX] Fixer.io failed:`, error);
   }
 
-  // All APIs failed
-  console.error(`[FX] ALL APIs failed for ${base}→${quote} – using fallback`);
+  // Fallback if Fixer.io fails
+  console.error(`[FX] Fixer.io failed for ${base}→${quote} – using fallback`);
   return { rate: 1, date: today(), provider: 'fallback' };
 }
 
@@ -71,8 +62,9 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
 
 async function getFromFixerIo(base: string, quote: string): Promise<FxResult | null> {
   try {
-    // Fixer.io API - reliable for Middle East currencies
-    const url = `https://api.fixer.io/latest?base=${base}&symbols=${quote}`;
+    // Fixer.io API with provided API key
+    const apiKey = 'e873239c9944dc25c2b59d1d01d71d77';
+    const url = `https://api.fixer.io/latest?access_key=${apiKey}&base=${base}&symbols=${quote}`;
     console.log(`[FX] Fixer.io request: ${url}`);
     
     const response = await fetch(url, { 
@@ -115,100 +107,6 @@ async function getFromFixerIo(base: string, quote: string): Promise<FxResult | n
 
   } catch (error) {
     console.error(`[FX] Fixer.io request failed:`, error);
-    return null;
-  }
-}
-
-async function getFromExchangeRateHost(base: string, quote: string): Promise<FxResult | null> {
-  try {
-    // Alternative API
-    const url = `https://api.exchangerate.host/convert?from=${base}&to=${quote}&amount=1`;
-    console.log(`[FX] ExchangeRate.host request: ${url}`);
-    
-    const response = await fetch(url, { 
-      next: { revalidate: 300 },
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      console.error(`[FX] ExchangeRate.host failed: ${response.status}`);
-      return null;
-    }
-
-    const data: any = await response.json();
-    console.log(`[FX] ExchangeRate.host response:`, JSON.stringify(data, null, 2));
-
-    if (!data.success) {
-      console.error(`[FX] ExchangeRate.host API error`);
-      return null;
-    }
-
-    const rate = data.result;
-    if (!rate || isNaN(rate) || rate <= 0) {
-      console.error(`[FX] ExchangeRate.host invalid rate:`, rate);
-      return null;
-    }
-
-    return {
-      rate: Number(rate.toFixed(6)),
-      date: data.date || today(),
-      provider: 'exchangerate'
-    };
-
-  } catch (error) {
-    console.error(`[FX] ExchangeRate.host request failed:`, error);
-    return null;
-  }
-}
-
-async function getFromCurrencyAPI(base: string, quote: string): Promise<FxResult | null> {
-  try {
-    // Third alternative - currencyapi.com
-    const url = `https://api.currencyapi.com/v3/latest?apikey=cur_live_free&base_currency=${base}&currencies=${quote}`;
-    console.log(`[FX] CurrencyAPI request: ${url}`);
-    
-    const response = await fetch(url, { 
-      next: { revalidate: 300 },
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      console.error(`[FX] CurrencyAPI failed: ${response.status}`);
-      return null;
-    }
-
-    const data: any = await response.json();
-    console.log(`[FX] CurrencyAPI response:`, JSON.stringify(data, null, 2));
-
-    if (!data.data || typeof data.data !== 'object') {
-      console.error(`[FX] CurrencyAPI invalid response format`);
-      return null;
-    }
-
-    const currencyData = data.data[quote];
-    if (!currencyData || !currencyData.value) {
-      console.error(`[FX] CurrencyAPI no rate for ${quote}`);
-      return null;
-    }
-
-    const rate = currencyData.value;
-    if (isNaN(rate) || rate <= 0) {
-      console.error(`[FX] CurrencyAPI invalid rate:`, rate);
-      return null;
-    }
-
-    return {
-      rate: Number(rate.toFixed(6)),
-      date: today(),
-      provider: 'currencylayer'
-    };
-
-  } catch (error) {
-    console.error(`[FX] CurrencyAPI request failed:`, error);
     return null;
   }
 }

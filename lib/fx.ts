@@ -1,22 +1,24 @@
 // lib/fx.ts
 // -----------------------------------------------------------------------------
-// Reliable foreign-exchange helper using exchangerate-api.com
-// Provides accurate, real-time exchange rates
+// 100 % "won't-crash" foreign-exchange helper.
+// • Works with ~170 ISO-4217 currencies (and BTC/ETH) via exchangerate.host
+// • Falls back intelligently if a direct pair is missing
+// • Never throws out of this function – you always get a numeric rate
 // -----------------------------------------------------------------------------
 
 export interface FxResult {
   rate: number;   // price of 1 unit of base expressed in quote
   date: string;   // YYYY-MM-DD  (UTC)
-  provider: 'exchangerate-api' | 'fallback';
+  provider: 'exchangerate.host' | 'fallback';
 }
 
 /**
- * Fetch live FX rates. Guaranteed to resolve.
+ * Fetch live FX.  Guaranteed to resolve.
  * @param from ISO-4217 code – e.g. "EGP"
  * @param to   ISO-4217 code – e.g. "AED"
  */
 export async function getFxRate(from: string, to: string): Promise<FxResult> {
-  // normalize
+  // ­­­normalise ­­­
   const base  = (from ?? '').trim().toUpperCase();
   const quote = (to   ?? '').trim().toUpperCase();
 
@@ -25,75 +27,65 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
     return { rate: 1, date: today(), provider: 'fallback' };
   }
 
-  console.log(`[FX] Getting rate from ${base} to ${quote}`);
+  // 1) try direct pair
+  const direct = await call(`/convert?from=${base}&to=${quote}`);
+  if (direct) return direct;
 
-  // Try the reliable API
-  const result = await callExchangeRateAPI(base, quote);
-  if (result) {
-    console.log(`[FX] Success: 1 ${base} = ${result.rate} ${quote}`);
-    return result;
-  }
-
-  // Fallback with hardcoded rates for EGP/AED if API fails
-  if ((base === 'EGP' && quote === 'AED') || (base === 'AED' && quote === 'EGP')) {
-    const rate = base === 'EGP' ? 0.074 : 13.46; // Real rates as of recent data
-    console.log(`[FX] Using hardcoded rate: 1 ${base} = ${rate} ${quote}`);
-    return { 
-      rate, 
-      date: today(), 
-      provider: 'fallback' 
+  // 2) cross-via-USD (rare exotic pairs)
+  const leg1 = await call(`/convert?from=${base}&to=USD`);
+  const leg2 = await call(`/convert?from=USD&to=${quote}`);
+  if (leg1 && leg2) {
+    return {
+      rate: Number((leg1.rate * leg2.rate).toFixed(6)),
+      date: leg1.date,                    // both legs have the same date
+      provider: 'exchangerate.host',
     };
   }
 
-  // Final safety-net for other currencies
-  console.error(`[FX] No rate found for ${base}→${quote} – using 1:1`);
+  // 3) final safety-net
+  console.error(`[FX] totally missing pair ${base}→${quote} – using 1:1.`);
   return { rate: 1, date: today(), provider: 'fallback' };
 }
 
 /* -------------------------------------------------------------------------- */
 
-async function callExchangeRateAPI(base: string, quote: string): Promise<FxResult | null> {
+async function call(endpoint: string): Promise<FxResult | null> {
+  const url = `https://api.exchangerate.host${endpoint}`;
   try {
-    // Using exchangerate-api.com which is more reliable
-    const url = `https://api.exchangerate-api.com/v4/latest/${base}`;
-    console.log(`[FX] Calling API: ${url}`);
+    const r = await fetch(url, { next: { revalidate: 60 * 60 } }); // 1 h cache
     
-    const response = await fetch(url, { 
-      next: { revalidate: 60 * 60 } // 1 hour cache
-    });
-    
-    if (!response.ok) {
-      console.error(`[FX] API request failed: ${response.status} ${response.statusText}`);
+    if (!r.ok) {
+      console.error(`[FX] API request failed: ${r.status} ${r.statusText}`);
       return null;
     }
     
-    const data: any = await response.json();
-    console.log(`[FX] API Response:`, JSON.stringify(data, null, 2));
+    const j: any = await r.json();
     
-    if (!data.rates || !data.rates[quote]) {
-      console.error(`[FX] Rate not found for ${quote} in response`);
+    // Debug logging to see what the API actually returns
+    console.log(`[FX] API Response for ${endpoint}:`, JSON.stringify(j, null, 2));
+    
+    // Check if the API response indicates success
+    if (j.success === false) {
+      console.error(`[FX] API returned error:`, j.error);
       return null;
     }
     
-    const rate = Number(data.rates[quote]);
+    const val = Number(j.result ?? j.info?.rate);
     
-    if (!rate || Number.isNaN(rate) || rate <= 0) {
-      console.error(`[FX] Invalid rate value: ${rate}`);
+    if (!val || Number.isNaN(val) || val <= 0) {
+      console.error(`[FX] Invalid rate value:`, val, 'from response:', j);
       return null;
     }
     
-    const date = data.date || today();
-    
-    console.log(`[FX] Parsed rate: ${rate}, date: ${date}`);
-    return { 
-      rate, 
-      date, 
-      provider: 'exchangerate-api' as const 
-    };
-    
+    const dt  = (j.date || j.info?.timestamp
+                 ? new Date(j.date ?? j.info.timestamp * 1000)
+                 : new Date()).toISOString().slice(0, 10);
+                 
+    console.log(`[FX] Parsed rate: ${val}, date: ${dt}`);
+    return { rate: val, date: dt, provider: 'exchangerate.host' };
   } catch (error) {
-    console.error(`[FX] API call failed:`, error);
-    return null;
+    console.error(`[FX] Request failed for ${endpoint}:`, error);
+    return null;                         // swallow – we handle fallback above
   }
 }
 

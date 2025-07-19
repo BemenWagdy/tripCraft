@@ -11,6 +11,7 @@
 import { getFxRate }       from '@/lib/fx';        // Fixer (cached)
 import { currencyCode }    from '@/lib/currency';  // tiny country→ISO map
 import { groq, GROQ_MODEL } from '@/lib/groq';
+import { chatWithRetry }   from '@/lib/retryGroq';
 import { appendError }     from '@/lib/logger';
 import { NextResponse }    from 'next/server';
 import { z }               from 'zod';
@@ -207,116 +208,117 @@ Return JSON ONLY, matching the function schema.`;
   /*－－ call LLM －－*/
   let llm;
   try {
-    llm = await groq.chat.completions.create({
-    model: GROQ_MODEL, temperature: 0.7,
-    tools: [{ 
-      type: 'function', 
-      function: { 
-        name: 'generate_itinerary', 
-        parameters: {
-          type: 'object',
-          properties: {
-            intro: { type: 'string' },
-            beforeYouGo: { 
-              type: 'array', 
-              items: { type: 'string' },
-              minItems: 6
-            },
-            visa: {
-              type: 'object',
-              properties: {
-                required: { type: 'boolean' },
-                type: { type: 'string' },
-                applicationMethod: { type: 'string' },
-                processingTime: { type: 'string' },
-                fee: { type: 'string' },
-                validityPeriod: { type: 'string' },
-                appointmentWarning: { type: 'string' },
-                additionalRequirements: { type: 'string' }
+    llm = await chatWithRetry({
+      model: GROQ_MODEL,
+      temperature: 0.7,
+      tools: [{ 
+        type: 'function', 
+        function: { 
+          name: 'generate_itinerary', 
+          parameters: {
+            type: 'object',
+            properties: {
+              intro: { type: 'string' },
+              beforeYouGo: { 
+                type: 'array', 
+                items: { type: 'string' },
+                minItems: 6
               },
-              required: ['required', 'type']
-            },
-            currency: {
-              type: 'object',
-              properties: {
-                destinationCode: { type: 'string' },
-                homeToDestination: { type: 'string' },
-                destinationToHome: { type: 'string' }
-              },
-              required: ['destinationCode', 'homeToDestination', 'destinationToHome']
-            },
-            averages: {
-              type: 'object',
-              properties: {
-                hostel: { type: 'number' },
-                midHotel: { type: 'number' },
-                highEnd: { type: 'number' }
-              }
-            },
-            cultureTips: {
-              type: 'array',
-              items: { type: 'string' },
-              minItems: 5
-            },
-            foodList: {
-              type: 'array',
-              items: {
+              visa: {
                 type: 'object',
                 properties: {
-                  name: { type: 'string' },
-                  note: { type: 'string' },
-                  rating: { type: 'number' },
-                  source: { type: 'string' }
+                  required: { type: 'boolean' },
+                  type: { type: 'string' },
+                  applicationMethod: { type: 'string' },
+                  processingTime: { type: 'string' },
+                  fee: { type: 'string' },
+                  validityPeriod: { type: 'string' },
+                  appointmentWarning: { type: 'string' },
+                  additionalRequirements: { type: 'string' }
                 },
-                required: ['name', 'rating', 'source']
+                required: ['required', 'type']
               },
-              minItems: 10
-            },
-            practicalInfo: {
-              type: 'object',
-              properties: {
-                powerPlugType: { type: 'string' },
-                simCardOptions: { type: 'string' },
-                emergencyNumbers: { type: 'string' },
-                commonScams: { type: 'string' },
-                safetyApps: { type: 'string' },
-                healthRequirements: { type: 'string' }
-              }
-            },
-            days: {
-              type: 'array',
-              items: {
+              currency: {
                 type: 'object',
                 properties: {
-                  date: { type: 'string' },
-                  title: { type: 'string' },
-                  steps: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        time: { type: 'string' },
-                        text: { type: 'string' }
-                      },
-                      required: ['time', 'text']
+                  destinationCode: { type: 'string' },
+                  homeToDestination: { type: 'string' },
+                  destinationToHome: { type: 'string' }
+                },
+                required: ['destinationCode', 'homeToDestination', 'destinationToHome']
+              },
+              averages: {
+                type: 'object',
+                properties: {
+                  hostel: { type: 'number' },
+                  midHotel: { type: 'number' },
+                  highEnd: { type: 'number' }
+                }
+              },
+              cultureTips: {
+                type: 'array',
+                items: { type: 'string' },
+                minItems: 5
+              },
+              foodList: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    note: { type: 'string' },
+                    rating: { type: 'number' },
+                    source: { type: 'string' }
+                  },
+                  required: ['name', 'rating', 'source']
+                },
+                minItems: 10
+              },
+              practicalInfo: {
+                type: 'object',
+                properties: {
+                  powerPlugType: { type: 'string' },
+                  simCardOptions: { type: 'string' },
+                  emergencyNumbers: { type: 'string' },
+                  commonScams: { type: 'string' },
+                  safetyApps: { type: 'string' },
+                  healthRequirements: { type: 'string' }
+                }
+              },
+              days: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    date: { type: 'string' },
+                    title: { type: 'string' },
+                    steps: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          time: { type: 'string' },
+                          text: { type: 'string' }
+                        },
+                        required: ['time', 'text']
+                      }
                     }
-                  }
-                },
-                required: ['date', 'title', 'steps']
-              }
+                  },
+                  required: ['date', 'title', 'steps']
+                }
+              },
+              totalCost: { type: 'string' },
+              totalCostLocal: { type: 'string' },
+              totalCostDestination: { type: 'string' }
             },
-            totalCost: { type: 'string' },
-            totalCostLocal: { type: 'string' },
-            totalCostDestination: { type: 'string' }
-          },
-          required: ['intro', 'beforeYouGo', 'visa', 'currency', 'cultureTips', 'foodList', 'days']
+            required: ['intro', 'beforeYouGo', 'visa', 'currency', 'cultureTips', 'foodList', 'days']
+          }
         }
-      }
-    }],
-    messages:[
-      { role:'system', content:system },
-      { role:'user',   content:user }
-    ]
+      }],
+      messages:[
+        { role:'system', content:system },
+        { role:'user',   content:user }
+      ]
     });
   } catch (e) {
     appendError(e, 'groq-api');

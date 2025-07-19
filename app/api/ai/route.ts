@@ -43,7 +43,10 @@ const schema = {
           fee: { type: 'string' },
           validityPeriod: { type: 'string' },
           appointmentWarning: { type: 'string' },
-          additionalRequirements: { type: 'string' }
+          additionalRequirements: { 
+            type: 'array',
+            items: { type: 'string' }
+          }
         },
         required: ['required', 'type']
       },

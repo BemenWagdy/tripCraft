@@ -33,7 +33,7 @@ export interface ItineraryData {
     fee?: string;
     validityPeriod?: string;
     appointmentWarning?: string;
-    additionalRequirements?: string;
+    additionalRequirements?: string[];
   };
   currency: {
     destinationCode: string;

@@ -171,8 +171,8 @@ export async function POST(req: Request) {
     const homeCurrency = getCurrencyFromCountry(form.country || '');
     const destCurrency = getCurrencyFromDestination(form.destination || '');
     
-    const from = iso(homeCurrency);      // e.g. "AED"
-    const to   = iso(destCurrency);      // e.g. "EGP"
+    const from = homeCurrency;      // e.g. "AED"
+    const to   = destCurrency;      // e.g. "EGP"
 
     if (!from || !to) {
       return new Response(

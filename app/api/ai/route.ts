@@ -2,6 +2,7 @@ import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 import { getFxRate } from '@/lib/fx';
+import { getCurrencyFromCountry, getCurrencyFromDestination } from '@/lib/currency-mapping';
 
 const schema = {
   name: 'generate_itinerary',
@@ -166,9 +167,12 @@ export async function POST(req: Request) {
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     // Get real-time exchange rates
-    const iso = (v?: string) => (v ?? '').trim().toUpperCase();
-    const from = iso(form.homeCurrency);      // e.g. "AED"
-    const to   = iso(form.destCurrency);      // e.g. "EGP"
+    // Get currency codes from country and destination
+    const homeCurrency = getCurrencyFromCountry(form.country || '');
+    const destCurrency = getCurrencyFromDestination(form.destination || '');
+    
+    const from = iso(homeCurrency);      // e.g. "AED"
+    const to   = iso(destCurrency);      // e.g. "EGP"
 
     if (!from || !to) {
       return new Response(

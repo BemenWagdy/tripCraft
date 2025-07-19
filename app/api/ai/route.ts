@@ -166,14 +166,21 @@ export async function POST(req: Request) {
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     // Get real-time exchange rates
-    const iso = (code: string) => code.trim().toUpperCase().slice(0, 3);
-    const base = iso(form.countryCurrencyCode);          // e.g. "EGP"
-    const dest = iso(form.destinationCurrencyCode);      // e.g. "EUR"
+    const iso = (v?: string) => (v ?? '').trim().toUpperCase();
+    const from = iso(form.homeCurrency);      // e.g. "AED"
+    const to   = iso(form.destCurrency);      // e.g. "EGP"
+
+    if (!from || !to) {
+      return new Response(
+        JSON.stringify({ error: 'homeCurrency or destCurrency missing' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     let homeToDest = 0, destToHome = 0;
     try {
-      homeToDest = await getFxRate(base, dest);     // 1 EGP → EUR
-      destToHome = await getFxRate(dest, base);     // 1 EUR → EGP
+      homeToDest = await getFxRate(from, to);     // 1 AED → EGP
+      destToHome = await getFxRate(to, from);     // 1 EGP → AED
     } catch (err) {
       console.warn('FX fallback', err);
       // graceful degradation ↴
@@ -220,7 +227,8 @@ export async function POST(req: Request) {
 
             2. CURRENCY & PAYMENTS - Direct exchange rates:
                - Show ${form.country} currency to destination currency rate: ${homeToDest > 0 ? `1 ${base} = ${homeToDest.toFixed(4)} ${dest}` : 'Check current exchange rates'}
-               - Show destination to ${form.country} currency rate: ${destToHome > 0 ? `1 ${dest} = ${destToHome.toFixed(4)} ${base}` : 'Check current exchange rates'}
+               - Show ${form.country} currency to destination currency rate: ${homeToDest > 0 ? `1 ${from} = ${homeToDest.toFixed(4)} ${to}` : 'Check current exchange rates'}
+               - Show destination to ${form.country} currency rate: ${destToHome > 0 ? `1 ${to} = ${destToHome.toFixed(4)} ${from}` : 'Check current exchange rates'}
                - Explain local payment culture (cash vs card preference)
                - Detail tipping customs with specific amounts/percentages
                - ATM availability and fees

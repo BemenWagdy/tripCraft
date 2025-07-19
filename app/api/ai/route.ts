@@ -69,7 +69,7 @@ const schema = {
       foodList: {
         type: 'array',
         description: 'Must-try dishes or restaurants with rating & source',
-        minItems: 10,
+        minItems: 1,
         items: {
           type: 'object',
           properties: {

@@ -123,15 +123,18 @@ export default function Questionnaire() {
         body: JSON.stringify(formData)
       });
 
+      // Clone response to avoid "body stream already read" error
+      const responseClone = response.clone();
+
       // Handle non-JSON or error responses gracefully
       if (!response.ok) {
         let errorMessage = 'Failed to generate itinerary';
         try {
-          const errorData = await response.json();
+          const errorData = await responseClone.json();
           errorMessage = errorData.error || errorMessage;
         } catch {
           // If response is not JSON, get text
-          const errorText = await response.text();
+          const errorText = await responseClone.text();
           errorMessage = errorText || errorMessage;
         }
         throw new Error(errorMessage);

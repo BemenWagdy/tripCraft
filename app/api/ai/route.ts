@@ -366,9 +366,9 @@ export async function POST(req: Request) {
       },
 
       currency: {
-        destinationCode: "Local Currency",
-        homeToDestination: "Check current exchange rates",
-        destinationToHome: "Check current exchange rates",
+        destinationCode: destIso,
+        homeToDestination: `1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}`,
+        destinationToHome: `1 ${destIso} = ${fxDestToHome.toFixed(4)} ${homeIso}`,
         cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
         tippingNorms: "Research local tipping customs - varies significantly by country and service type",
         atmAvailability: "ATMs widely available in cities, may be limited in rural areas",

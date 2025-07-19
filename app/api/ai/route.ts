@@ -171,6 +171,9 @@ export async function POST(req: Request) {
       (form as any).destinationCountry ?? form.destination
     ) || 'USD';
     
+    homeIso ||= 'USD';
+    destIso ||= 'USD';
+    
     let fxHomeToDest = 1;
     let fxDestToHome = 1;
     let fxDate       = '';

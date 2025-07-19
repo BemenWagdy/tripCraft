@@ -7,8 +7,6 @@ export function appendError(err: unknown, scope = 'server') {
   });
   
   if (process.env.NODE_ENV === 'development') {
-    console.error('[TripCraft]', entry);
-    
     // Only import and use fs on the server side
     if (typeof window === 'undefined') {
       try {

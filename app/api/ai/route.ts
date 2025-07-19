@@ -178,6 +178,7 @@ export async function POST(req: Request) {
     destIso = currencyCode((form as any).destinationCountry
                    ?? form.destination)                              ?? 'USD';   // e.g. "AED"
 
+    // Initialize with defaults
     fxHomeToDest = 1;
     fxDestToHome = 1;
     fxDate = '';
@@ -185,9 +186,9 @@ export async function POST(req: Request) {
 
     console.log(`[API] Currency conversion: ${homeIso} (home) → ${destIso} (destination)`);
 
-    // ENSURE WE ACTUALLY CALL FIXER.IO
+    // Make REAL API calls to Fixer.io - this will show up in dashboard
     try {
-      console.log(`[API] 🌍 FORCING Fixer.io API calls for currency conversion...`);
+      console.log(`[API] 🌍 Making REAL Fixer.io API calls for currency conversion...`);
       
       // Get rate from home to destination (EGP → AED)
       console.log(`[API] 📞 Calling getFxRate(${homeIso}, ${destIso})`);
@@ -210,17 +211,9 @@ export async function POST(req: Request) {
       
     } catch (err) {
       console.error('[API] 💥 FX lookup COMPLETELY FAILED:', err);
-      
-      // Use correct hardcoded rates as fallback
-      if (homeIso === 'EGP' && destIso === 'AED') {
-        fxHomeToDest = 0.074;
-        fxDestToHome = 13.46;
-        console.log('[API] 🔧 Using hardcoded EGP/AED rates as fallback');
-      } else if (homeIso === 'AED' && destIso === 'EGP') {
-        fxHomeToDest = 13.46;
-        fxDestToHome = 0.074;
-        console.log('[API] 🔧 Using hardcoded AED/EGP rates as fallback');
-      }
+      // Keep defaults (1:1) if API fails completely
+      console.log('[API] 🔧 Using 1:1 fallback rates');
+      fxNote = 'Exchange rates unavailable';
     }
     /* ----------------------------------------------------------- */
 

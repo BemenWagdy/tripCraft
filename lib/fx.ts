@@ -1,6 +1,6 @@
 // lib/fx.ts
 // -----------------------------------------------------------------------------
-// REAL Fixer.io API integration - NO HARDCODED RATES
+// REAL Fixer.io API integration - Uses working pattern from test
 // -----------------------------------------------------------------------------
 
 export interface FxResult {

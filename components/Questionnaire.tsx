@@ -88,66 +88,88 @@ export default function Questionnaire() {
   });
 
   /* ---------------------------------------------------------------
-     onSubmit – single read of the Response body  (no stream errors)
+     improved onSubmit
   ----------------------------------------------------------------*/
-  const onSubmit = async (values: QuestionnaireValues) => {
+  const onSubmit = async (data: QuestionnaireValues) => {
     setIsLoading(true);
     
     try {
       // Calculate duration
-      const duration = Math.ceil((values.dateRange.to.getTime() - values.dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+      const duration = Math.ceil((data.dateRange.to.getTime() - data.dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
       
       // Transform data for the API
       const formData = {
-        destination: values.destination,
-        country: values.country,
-        dietary: values.dietary.toLowerCase(),
-        travelVibe: values.travelVibe.toLowerCase(),
-        interests: values.interests,
-        dailyBudget: values.budgetPerDay,
+        destination: data.destination,
+        country: data.country,
+        dietary: data.dietary.toLowerCase(),
+        travelVibe: data.travelVibe.toLowerCase(),
+        interests: data.interests,
+        dailyBudget: data.budgetPerDay,
         duration: duration,
-        groupType: values.groupType,
-        accommodation: values.accommodation,
-        transportPref: values.transportPref,
-        occasion: values.occasion,
-        mustSee: values.mustSee,
-        avoid: values.avoid,
+        groupType: data.groupType,
+        accommodation: data.accommodation,
+        transportPref: data.transportPref,
+        occasion: data.occasion,
+        mustSee: data.mustSee,
+        avoid: data.avoid,
         dateRange: {
-          from: values.dateRange.from.toISOString(),
-          to: values.dateRange.to.toISOString()
+          from: data.dateRange.from.toISOString(),
+          to: data.dateRange.to.toISOString()
         },
       };
 
-      const res = await fetch('/api/ai', {
-        method: 'POST',
+      const res  = await fetch('/api/ai', {
+        method : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body   : JSON.stringify(formData)
       });
 
-      /* ---- always read body ONCE ---- */
-      const body = await res.json();       // single consumption
-      const ok = res.ok;
+      /* read raw text first so we can inspect / debug */
+      const raw = await res.text();
 
-      if (!ok) {
-        appendError(body.error ?? 'Unknown API error', 'api');
-        throw new Error(body.error ?? 'Server error – try again.');
+      /* empty body → bail early */
+      if (!raw.trim()) {
+        throw new Error('Server returned an empty response.');
       }
 
-      /* ---- success path ---- */
-      if (body.warnings?.length) {
-        // optional: toast / banner to tell the user something was auto-fixed
-        console.warn('[TripCraft] API warnings:', body.warnings.join(' | '));
+      let json: any;
+      try {
+        json = JSON.parse(raw);
+      } catch (e) {
+        /* most common failure: backend crashed & sent HTML */
+        console.error('[TripCraft] back-end returned non-JSON:');
+        console.error(raw.slice(0, 400));         // preview in dev tools
+        throw new Error(
+          'Itinerary service is temporarily unavailable. Please retry in a minute.'
+        );
       }
 
-      setItinerary(JSON.stringify(body));                    // push to result component
+      /* non-2xx status → bubble the back-end error message */
+      if (!res.ok) {
+        throw new Error(json.error || `Server error (${res.status})`);
+      }
 
-    } catch (err) {
+      /* optional: schema guard – make sure required keys exist */
+      if (!json.days || !Array.isArray(json.days) || !json.currency) {
+        throw new Error('LLM payload failed schema validation.');
+      }
+
+      /* optional: log warnings */
+      if (json.warnings?.length) {
+        console.warn('[TripCraft] API warnings:', json.warnings.join(' | '));
+      }
+
+      /* SUCCESS */
+      setItinerary(JSON.stringify(json));                    // push to result component
+
+    } catch (err: any) {
+      console.error(err);
       appendError(err, 'questionnaire-submit');
       setItinerary(`# Error Generating Itinerary
 
 We encountered an issue generating your itinerary. Please try again later.
 
-## Sample Itinerary for ${values.destination}
+## Sample Itinerary for ${data.destination}
 
 ### Day 1: Arrival
 - Check into accommodation

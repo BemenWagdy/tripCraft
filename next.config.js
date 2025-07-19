@@ -5,8 +5,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: { unoptimized: true },
-  optimizeFonts: false,
-  fontLoaders: [], // Completely disable font loaders to prevent AbortError
+  optimizeFonts: false, // Disable font optimization to prevent AbortError during build
   webpack(config) {
     config.cache = false;     // ← uncommented to fix WebAssembly memory allocation error
     

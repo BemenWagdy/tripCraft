@@ -25,23 +25,10 @@ export interface FormValues {
 export interface ItineraryData {
   intro: string;
   beforeYouGo: string[];
-  visa: {
-    required: boolean;
-    type: string;
-    applicationMethod?: string;
-    processingTime?: string;
-    fee?: string;
-    validityPeriod?: string;
-    appointmentWarning?: string;
-    additionalRequirements?: string[];
-  };
-  currency: {
-    destinationCode: string;
-    homeToDestination: string;
-    destinationToHome: string;
-  };
+  visa: string;
+  currency: { code: string; rateUsd: number };
   averages: { hostel: number; midHotel: number; highEnd: number };
-  weather?: string;
+  weather: string;
   cultureTips: string[];
   foodList: Array<{
     name: string;
@@ -49,15 +36,7 @@ export interface ItineraryData {
     rating: number;
     source: string;
   }>;
-  practicalInfo?: {
-    powerPlugType?: string;
-    simCardOptions?: string;
-    emergencyNumbers?: string;
-    commonScams?: string;
-    safetyApps?: string;
-    healthRequirements?: string;
-  };
-  tips?: string;
+  tips: string;
   days: Array<{
     date: string;
     title: string;
@@ -65,6 +44,4 @@ export interface ItineraryData {
     steps: Step[];
   }>;
   totalCost?: string;
-  totalCostLocal?: string;
-  totalCostDestination?: string;
 }

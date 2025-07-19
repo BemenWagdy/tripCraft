@@ -87,89 +87,65 @@ export default function Questionnaire() {
     },
   });
 
-  /* ---------------------------------------------------------------
-     improved onSubmit
-  ----------------------------------------------------------------*/
-  const onSubmit = async (data: QuestionnaireValues) => {
+  const onSubmit = async (values: QuestionnaireValues) => {
     setIsLoading(true);
     
     try {
       // Calculate duration
-      const duration = Math.ceil((data.dateRange.to.getTime() - data.dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+      const duration = Math.ceil((values.dateRange.to.getTime() - values.dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
       
       // Transform data for the API
       const formData = {
-        destination: data.destination,
-        country: data.country,
-        dietary: data.dietary.toLowerCase(),
-        travelVibe: data.travelVibe.toLowerCase(),
-        interests: data.interests,
-        dailyBudget: data.budgetPerDay,
+        destination: values.destination,
+        country: values.country,
+        foodStyle: values.dietary.toLowerCase(),
+        travelStyle: values.travelVibe.toLowerCase(),
+        interests: values.interests,
+        dailyBudget: values.budgetPerDay,
         duration: duration,
-        groupType: data.groupType,
-        accommodation: data.accommodation,
-        transportPref: data.transportPref,
-        occasion: data.occasion,
-        mustSee: data.mustSee,
-        avoid: data.avoid,
+        groupType: values.groupType,
+        accommodation: values.accommodation,
+        transportPref: values.transportPref,
+        occasion: values.occasion,
+        mustSee: values.mustSee,
+        avoid: values.avoid,
         dateRange: {
-          from: data.dateRange.from.toISOString(),
-          to: data.dateRange.to.toISOString()
+          from: values.dateRange.from.toISOString(),
+          to: values.dateRange.to.toISOString()
         },
       };
 
-      const res  = await fetch('/api/ai', {
-        method : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body   : JSON.stringify(formData)
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
       });
 
-      /* read raw text first so we can inspect / debug */
-      const raw = await res.text();
-
-      /* empty body → bail early */
-      if (!raw.trim()) {
-        throw new Error('Server returned an empty response.');
+      // Handle non-JSON or error responses gracefully
+      if (!response.ok) {
+        let errorMessage = 'Failed to generate itinerary';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // If response is not JSON, get text
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      let json: any;
-      try {
-        json = JSON.parse(raw);
-      } catch (e) {
-        /* most common failure: backend crashed & sent HTML */
-        console.error('[TripCraft] back-end returned non-JSON:');
-        console.error(raw.slice(0, 400));         // preview in dev tools
-        throw new Error(
-          'Itinerary service is temporarily unavailable. Please retry in a minute.'
-        );
-      }
-
-      /* non-2xx status → bubble the back-end error message */
-      if (!res.ok) {
-        throw new Error(json.error || `Server error (${res.status})`);
-      }
-
-      /* optional: schema guard – make sure required keys exist */
-      if (!json.days || !Array.isArray(json.days) || !json.currency) {
-        throw new Error('LLM payload failed schema validation.');
-      }
-
-      /* optional: log warnings */
-      if (json.warnings?.length) {
-        console.warn('[TripCraft] API warnings:', json.warnings.join(' | '));
-      }
-
-      /* SUCCESS */
-      setItinerary(JSON.stringify(json));                    // push to result component
-
-    } catch (err: any) {
-      console.error(err);
+      const data = await response.json();
+      setItinerary(JSON.stringify(data));
+    } catch (err) {
       appendError(err, 'questionnaire-submit');
       setItinerary(`# Error Generating Itinerary
 
 We encountered an issue generating your itinerary. Please try again later.
 
-## Sample Itinerary for ${data.destination}
+## Sample Itinerary for ${values.destination}
 
 ### Day 1: Arrival
 - Check into accommodation

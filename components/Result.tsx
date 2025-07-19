@@ -182,14 +182,7 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
                 <div>
                   <span className="font-semibold">Required documents:</span>
                   <ul className="mt-2 space-y-1">
-                    {(
-                      Array.isArray(data.visa?.additionalRequirements)
-                        ? data.visa.additionalRequirements
-                        : (data.visa?.additionalRequirements
-                            ? [data.visa.additionalRequirements]      // single string → array
-                            : []                                      // nothing → empty list
-                          )
-                    ).map((req: string, index: number) => (
+                    {data.visa.additionalRequirements.map((req: string, index: number) => (
                       <li key={index} className="flex items-start gap-2 ml-4">
                         <span className="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2 flex-shrink-0"></span>
                         <span className="text-gray-700">{req}</span>

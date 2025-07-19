@@ -4,6 +4,39 @@ import { NextResponse } from 'next/server';
 import { currencyCode } from '@/lib/currency';
 import { getFxRate } from '@/lib/fx';
 
+/** Very small subset – expand as you like */
+const COUNTRY_TO_CURRENCY: Record<string, string> = {
+  // Common countries
+  'United Arab Emirates': 'AED',
+  'UAE': 'AED',
+  'Egypt': 'EGP',
+  'United States': 'USD',
+  'United Kingdom': 'GBP',
+  'Belgium': 'EUR',
+  'France': 'EUR', 
+  'Germany': 'EUR',
+  'Canada': 'CAD',
+  'Japan': 'JPY',
+  'Australia': 'AUD',
+  'Saudi Arabia': 'SAR',
+  'Qatar': 'QAR',
+  'Kuwait': 'KWD',
+};
+
+/** Helper: try form.currency first, else map nationality/destination */
+function pickCurrency(countryName: string): string {
+  if (!countryName) return 'USD'; // fallback
+  
+  const currency = COUNTRY_TO_CURRENCY[countryName.trim()];
+  if (currency) return currency;
+  
+  // Try currencyCode as fallback
+  const currencyFromCode = currencyCode(countryName);
+  if (currencyFromCode) return currencyFromCode;
+  
+  return 'USD'; // final fallback
+}
+</parameter>
 const schema = {
   name: 'generate_itinerary',
   description: 'Return a fully-structured travel plan with specific, actionable information',

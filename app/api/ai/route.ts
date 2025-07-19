@@ -214,15 +214,9 @@ export async function POST(req: Request) {
         EGYPT: 'EGP',
         'UNITED ARAB EMIRATES': 'AED',
         UAE: 'AED',
-        DUBAI: 'AED',              // city → national currency
         BELGIUM: 'EUR',
-        BRUSSELS: 'EUR',
         USA: 'USD',
-        'UNITED STATES': 'USD',
-        PARIS: 'EUR',
-        LONDON: 'GBP',
-        TOKYO: 'JPY',
-        SYDNEY: 'AUD'
+        'UNITED STATES': 'USD'
       };
       return map[raw];
     }
@@ -236,18 +230,19 @@ export async function POST(req: Request) {
     let fxHomeToDest = 1;
     let fxDestToHome = 1;
     let fxDate       = '';
-    let fxNote       = '';
+    let fxNote       = 'Exchange rate unavailable';
     
-    try {
-      if (homeIso && destIso) {
+    if (homeIso && destIso) {               // 🟢 guard to prevent empty string calls
+      console.log('[FX] pair', homeIso, '→', destIso);
+      try {
         const { rate, date } = await getFxRate(homeIso, destIso);
         fxHomeToDest = rate;
         fxDestToHome = 1 / rate;
         fxDate       = date;
         fxNote       = `Exchange rates · updated ${fxDate}`;
+      } catch (err) {
+        console.error('[FX] lookup failed – falling back to 1 : 1', err);
       }
-    } catch (err) {
-      console.error('[FX] lookup failed – falling back to 1 : 1', err);
     }
     /* ----------------------------------------------------------- */
 

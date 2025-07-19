@@ -131,50 +131,68 @@ export async function POST(req: Request) {
 
   /*－－ build Groq prompt －－*/
   const system = 'You are an expert travel consultant. Reply ONLY with the JSON for the function call.';
+  
+  /* ───────────────── USER PROMPT ───────────────── */
   const user = `
-Generate a premium ${daysN}-day itinerary for a ${form.country} passport holder visiting ${form.destination}.
+Create a premium-grade itinerary for a **${form.country}** passport holder visiting **${form.destination}**.
 
-Dates       : ${startISO} → ${endISO}
-Budget/day  : $${form.dailyBudget}
-Group       : ${form.groupType}
-Vibe        : ${form.travelVibe}
-Interests   : ${form.interests?.join(', ') || 'General'}
-Diet        : ${form.dietary || 'None'}
-Currencies  : 1 ${homeIso} = ${fx.toFixed(4)} ${destIso}  |  ${fxNote}
+DATES · ${startISO} → ${endISO} (${daysN} days)  
+DAILY BUDGET · $${form.dailyBudget}  
+GROUP · ${form.groupType} · ${form.travelVibe}  
+INTERESTS · ${form.interests?.join(', ') || 'General'}  
+DIET · ${form.dietary || 'None'}  
+ACCOM · ${form.accommodation || 'Any'}  
+TRANSPORT · ${form.transportPref || 'Any'}
 
-BEFORE YOU GO (≥10):
-• Provide 10-15 actionable bullet points, each starting with an imperative verb
-• Examples: "Register itinerary with embassy", "Download local transport app", 
-  "Pre-book popular attraction tickets", "Buy prepaid SIM card online"
-• Make each item specific and actionable, not generic advice
+──────────────── SUMMARY ────────────────
+Begin the JSON with **intro** that is exactly **2–4 lively sentences** about  
+${form.destination}: vibe, 1-line history, why 2025 is a great time to go.
 
-VISA INFO - Include these exact keys:
-• status: "Visa required" / "Visa-free X days" / "eVisa available"
-• type: Specific visa type (e.g. "Short-stay Schengen (C)")
-• applicationCentre: Exact location/service (e.g. "VFS Global Cairo")
-• earliestApplyDate: When applications open (e.g. "6 months before travel")
-• processingTime: Realistic timeframe (e.g. "10 calendar days average")
-• feeHome: Cost in home currency
-• feeDest: Cost in destination currency
-• docs: Array of required documents
-• biometrics: Boolean and reusability info
-• tips: Pro-tips for smooth application
+──────────────── BEFORE-YOU-GO ───────────
+Return **10–12 HARD-ACTION bullet points**, each:
+• Tailored (mention city / country when relevant, no "generic" advice)  
+• Starts with a verb in the imperative  
+• Gives enough detail that a traveller could act on it today  
 
-DAILY PLAN REQUIREMENTS:
-• Minimum 8 steps per day (exclude hotel check-in/out)
-• Timeline: 06:30-23:00, no gaps >2 hours
-• Mix: landmarks, hidden gems, food stops, photo spots, evening activities
-• Every paid activity shows dual currency: "25 ${destIso} (${(25/fx).toFixed(0)} ${homeIso})"
-• Free activities: "Free (Free)"
-• End each day with "dailyTotal": "XXX ${destIso} (YYY ${homeIso})"
+*Examples to emulate (adapt to ${form.destination}):*  
+- "Book a *Deutsche Bahn* 9-€ regional day pass for intra-Bavaria trains"  
+- "Fill out Germany's **Digital Registration** if staying over 90 days"  
+- "Reserve a **1 GB eSIM** on *Telekom* (€4.95) – instant QR delivery"  
+- "Download the **MVV** app (Munich) for live U-Bahn schedules"  
+- "Buy *Schloss Nymphenburg* e-ticket slot (09:00 or 09:30 sell out fast)"
 
-COSTS & PRICING:
-• Every price shows BOTH currencies – destination first
-• Provide ≥10 food items with price/rating/source
-• Include grandTotalHome & grandTotalDest at root level
-• Emergency numbers are strings
-• JSON must satisfy the published schema
-`;
+──────────────── VISA ­ ───────────────
+Return a **visa** object with ALL of these keys:  
+
+| key | what to return |  
+| --- | --- |  
+| status            | "Visa required" / "Visa-free X days" / "eVisa" |  
+| type              | e.g. "Short-stay Schengen (C)" |  
+| applicationCentre | e.g. "VFS Global Cairo – Schengen lane" |  
+| earliestApplyDate | "6 months before entry" |  
+| processingTime    | "10 calendar days (avg Cairo centre)" |  
+| feeHome           | "€80 (${homeIso} equivalent)" |  
+| feeDest           | same amount shown in ${destIso} |  
+| docs              | array of EXACT docs ("biometric photo 35×45 mm", …) |  
+| biometrics        | "Yes – fingerprints valid 59 months" / "No" |  
+| tips              | 1-2 insider tips ("slots open midnight Cairo time") |
+
+──────────────── CURRENCY ───────────────
+Home → Dest: 1 ${homeIso} = ${fx.toFixed(4)} ${destIso}  
+Dest → Home: 1 ${destIso} = ${fxRev.toFixed(4)} ${homeIso}  
+${fxNote}
+
+──────────────── DAILY PLAN RULES ───────
+• 08:00–23:00, ≥ 8 steps (landmark, food, hidden gem, evening)  
+• No gap > 2h – insert café / viewpoint breaks  
+• Every paid item shows dual price: "${destIso} amount (${homeIso} amount)"  
+• Close each day with "dailyTotal" in both currencies
+
+──────────────── COSTS ───────────────────
+• Include grandTotalHome & grandTotalDest at root.
+
+Return JSON ONLY, matching the function schema.`;
+  /* ───────────── END USER PROMPT ───────────── */
 
   /*－－ call LLM －－*/
   const llm = await groq.chat.completions.create({

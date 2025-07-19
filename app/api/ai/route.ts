@@ -53,10 +53,11 @@ const schema = {
 
       averages: {
         type: 'object',
+        description: 'Accommodation prices in both destination and home currencies',
         properties: {
-          hostel: { type: 'number' },
-          midHotel: { type: 'number' },
-          highEnd: { type: 'number' }
+          hostel: { type: 'string' },
+          midHotel: { type: 'string' },
+          highEnd: { type: 'string' }
         }
       },
 
@@ -332,7 +333,7 @@ export async function POST(req: Request) {
             - Every cost must show both currencies: destination currency first, then home currency in parentheses
             - Use the exchange rates provided: 1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}
             - Format: "Amount ${destIso} (Amount ${homeIso})"
-            - Be consistent throughout the entire itinerary
+            - Example: hostel: "50 EGP (1.25 USD)", midHotel: "200 EGP (5.00 USD)", highEnd: "800 EGP (20.00 USD)"
             - Include costs for: meals, transportation, activities, accommodations, tips, shopping
             - Show daily totals and grand total in both currencies
 

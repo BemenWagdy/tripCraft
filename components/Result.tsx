@@ -335,19 +335,19 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
                 {data.averages.hostel && (
                   <div className="p-3 flex justify-between">
                     <span>Hostel</span>
-                    <span className="font-medium">${data.averages.hostel}</span>
+                    <span className="font-bold text-blue-600">{data.averages.hostel}</span>
                   </div>
                 )}
                 {data.averages.midHotel && (
                   <div className="p-3 flex justify-between">
                     <span>Mid-range hotel</span>
-                    <span className="font-medium">${data.averages.midHotel}</span>
+                    <span className="font-bold text-blue-600">{data.averages.midHotel}</span>
                   </div>
                 )}
                 {data.averages.highEnd && (
                   <div className="p-3 flex justify-between">
                     <span>High-end hotel</span>
-                    <span className="font-medium">${data.averages.highEnd}</span>
+                    <span className="font-bold text-blue-600">{data.averages.highEnd}</span>
                   </div>
                 )}
               </div>
@@ -423,7 +423,7 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
                       {step.time && <strong>{step.time} – </strong>}
                       {step.text}
                       {step.mode && <span className="text-gray-500"> ({step.mode})</span>}
-                      {step.cost && <span className="font-medium text-green-600"> · {step.cost}</span>}
+                      {step.cost && <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded"> · {step.cost}</span>}
                     </span>
                   </div>
                   {step.mapLink && (
@@ -439,7 +439,7 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
             {day.cost && (
               <div className="bg-gray-100 p-3 rounded-lg flex justify-between items-center">
                 <span className="font-semibold">Estimated day total</span>
-                <span className="font-bold text-lg">{day.cost}</span>
+                <span className="font-bold text-lg text-blue-600">{day.cost}</span>
               </div>
             )}
           </div>

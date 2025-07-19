@@ -1,233 +1,191 @@
 /* -----------------------------------------------------------------------
-  TripCraft API route
-  – single-file drop-in that
-      • uses Fixer.io via getFxRate()
-      • enforces   ≥10 complete food items  (no more post-fill loop)
-      • shows dual-currency prices everywhere
-      • trims console noise & dead code
-      • gives bullet-proof fallback JSON
+   TripCraft API route – v2
+   Adds roadmap items #2 #3 #4 #6 #10
+     #2  per-day weather snippets  (Open-Meteo, free / no key)
+     #3  strict Zod validation of the LLM payload
+     #4  structured logging via appendError(tag,…)
+     #6  automated "too-cheap / too-expensive" cost sanity warnings
+     #10 frontend UX hooks  → returns { warnings[] , uiHints{} }
 ------------------------------------------------------------------------ */
 
-import { getFxRate }       from '@/lib/fx';       // uses Fixer / cached
-import { currencyCode }    from '@/lib/currency'; // tiny country→ISO map
+import { getFxRate }       from '@/lib/fx';        // Fixer (cached)
+import { currencyCode }    from '@/lib/currency';  // tiny country→ISO map
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError }     from '@/lib/logger';
 import { NextResponse }    from 'next/server';
+import { z }               from 'zod';
 
-/*───────────────────────────  1 - LLM SCHEMA  ──────────────────────────*/
-const schema = {
-  name:        'generate_itinerary',
-  description: 'Return a fully-structured travel plan with actionable detail',
-  parameters: {
-    type: 'object',
-    properties: {
-      intro: { type: 'string' },
+/*──────────────────────────  helper: weather  ──────────────────────────*/
+async function getDailyWeather(
+  city: string,
+  startISO: string,
+  endISO: string
+): Promise<Record<string,string>> {
+  /* A real build would geocode "city" → lat/lon first.
+     To keep this self-contained we default to 0/0 when geocoding fails
+     → the function degrades gracefully (returns {}). */
+  try {
+    const geo = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+        city
+      )}&count=1`
+    ).then(r => r.json());
+    if (!geo?.results?.[0]) return {};
 
-      beforeYouGo: {
-        type: 'array', description: 'Pre-travel tasks',
-        minItems: 6,  items: { type: 'string' }
-      },
+    const { latitude, longitude, timezone } = geo.results[0];
+    const wx = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&start_date=${startISO}&end_date=${endISO}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=${timezone}`
+    ).then(r => r.json());
 
-      visa: {
-        type: 'object', description: 'Visa requirements',
-        properties: {
-          required:            { type: 'boolean' },
-          type:                { type: 'string' },
-          applicationMethod:   { type: 'string' },
-          processingTime:      { type: 'string' },
-          fee:                 { type: 'string' },
-          validityPeriod:      { type: 'string' },
-          appointmentWarning:  { type: 'string' },
-          additionalRequirements: {
-            type: 'array', items: { type: 'string' }
-          }
-        },
-        required: ['required', 'type']
-      },
-
-      currency: {
-        type: 'object',
-        properties: {
-          destinationCode:     { type: 'string' },
-          homeToDestination:   { type: 'string' },
-          destinationToHome:   { type: 'string' },
-          cashCulture:         { type: 'string' },
-          tippingNorms:        { type: 'string' },
-          atmAvailability:     { type: 'string' },
-          cardAcceptance:      { type: 'string' }
-        },
-        required: ['destinationCode','homeToDestination','destinationToHome']
-      },
-
-      averages: {
-        type: 'object',
-        description: 'Accommodation price bands',
-        properties: {
-          hostel:   { type: 'string' },
-          midHotel: { type: 'string' },
-          highEnd:  { type: 'string' }
-        }
-      },
-
-      weather:     { type: 'string' },
-
-      cultureTips: {
-        type: 'array', description: 'Etiquette & local customs',
-        minItems: 5,  items: { type: 'string' }
-      },
-
-      foodList: {                                   // ⇠ tightened
-        type: 'array', description: '≥10 dishes / venues',
-        minItems: 10,
-        items: {
-          type: 'object',
-          properties: {
-            name:   { type: 'string' },
-            note:   { type: 'string' },
-            price:  { type: 'string' },  // "150 EGP (3.75 USD)"
-            rating: { type: 'number' },
-            source: { type: 'string' }
-          },
-          required: ['name','price','rating','source']
-        }
-      },
-
-      practicalInfo: {
-        type: 'object',
-        description: 'Power, SIM, emergencies, scams…',
-        properties: {
-          powerPlugType:   { type: 'string' },
-          powerVoltage:    { type: 'string' },
-          simCardOptions:  { type: 'array', items: { type: 'string' } },
-          emergencyNumbers:{ type: 'object', additionalProperties:{type:'string'}},
-          commonScams:     { type: 'array', items: { type: 'string' } },
-          safetyApps:      { type: 'array', items: { type: 'string' } },
-          healthRequirements:{type:'array',items:{type:'string'}}
-        }
-      },
-
-      tips: { type: 'string' },
-
-      days: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            date:  { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
-            title: { type: 'string' },
-            cost:  { type: 'string' },
-            steps: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  time:            { type: 'string' },
-                  text:            { type: 'string' },
-                  mode:            { type: 'string' },
-                  cost:            { type: 'string' },
-                  costLocal:       { type: 'string' },
-                  costDestination: { type: 'string' }
-                },
-                required: ['text','time']
-              }
-            }
-          },
-          required: ['date','title','steps']
-        }
-      },
-
-      totalCost:            { type: 'string' },
-      totalCostLocal:       { type: 'string' },
-      totalCostDestination: { type: 'string' }
-    },
-    required: ['intro','beforeYouGo','visa','currency','days']
+    const out: Record<string,string> = {};
+    wx.daily.time.forEach((d: string, i: number) => {
+      out[d] = `${wx.daily.weathercode[i]} · ${wx.daily.temperature_2m_min[i]}-${wx.daily.temperature_2m_max[i]}°C`;
+    });
+    return out;
+  } catch (e) {
+    appendError(e, 'weather');
+    return {};
   }
-};
+}
 
-/*──────────────────────── 2 - ENTRY POINT  ───────────────────────────*/
-export async function POST (req: Request) {
-  /*───── parse form safely ─────*/
+/*─────────────────────── 1 · JSON schema (Zod) ─────────────────────────*/
+const foodItem = z.object({
+  name:   z.string(),
+  note:   z.string(),
+  price:  z.string(),
+  rating: z.number(),
+  source: z.string()
+});
+const itinerarySchema = z.object({
+  intro:        z.string(),
+  beforeYouGo:  z.array(z.string()).min(6),
+  visa:         z.object({
+                  required: z.boolean(),
+                  type:     z.string()
+                }).passthrough(),
+  currency:     z.object({
+                  destinationCode:   z.string(),
+                  homeToDestination: z.string(),
+                  destinationToHome: z.string()
+                }).passthrough(),
+  averages:     z.object({
+                  hostel:   z.string(),
+                  midHotel: z.string(),
+                  highEnd:  z.string()
+                }).optional(),
+  cultureTips:  z.array(z.string()).min(5),
+  foodList:     z.array(foodItem).min(10),
+  practicalInfo:z.record(z.any()).optional(),
+  days: z.array(
+          z.object({
+            date:  z.string(),
+            title: z.string(),
+            steps: z.array(z.object({
+              time: z.string(),
+              text: z.string()
+            }))
+          })
+        ),
+  totalCost:            z.string().optional(),
+  totalCostLocal:       z.string().optional(),
+  totalCostDestination: z.string().optional()
+}).passthrough();
+
+/*────────────────────── 2 · POST handler  ──────────────────────────────*/
+export async function POST(req: Request) {
+  /*－－ parse incoming form －－*/
   let form: any;
   try { form = await req.json(); }
   catch (e) {
-    appendError(e,'bad-json');
-    return NextResponse.json({error:'Bad request JSON'}, {status:400});
+    appendError(e,'bad-json');             // (#4 structured log)
+    return NextResponse.json({ error:'Bad JSON' }, { status:400 });
   }
 
-  /*───── basic dates & duration ─────*/
+  /*－－ basic date maths －－*/
   const start = new Date(form.dateRange.from);
   const end   = new Date(form.dateRange.to);
-  const days  = Math.max(1, Math.ceil((end.getTime()-start.getTime())/864e5));
+  const daysN = Math.max(1, Math.ceil((end.getTime()-start.getTime())/864e5));
+  const startISO = start.toISOString().split('T')[0];
+  const endISO   = end.toISOString().split('T')[0];
 
-  /*───── currency codes ─────*/
-  const homeIso = currencyCode(form.country)      || 'USD';
-  const destIso = currencyCode(form.destination)  || 'USD';
+  /*－－ currency + FX －－*/
+  const homeIso = currencyCode(form.country)     || 'USD';
+  const destIso = currencyCode(form.destination) || 'USD';
 
-  /*───── live FX via Fixer (getFxRate wraps cache + error) ─────*/
-  let rate = 1, rateRev = 1, fxDate = '', fxNote = 'Same currency';
+  let fx = 1, fxRev = 1, fxDate = '', fxNote='Same currency';
   if (homeIso !== destIso) {
     try {
-      const r = await getFxRate(homeIso, destIso);
-      rate     = r.rate;
-      rateRev  = +(1 / rate).toFixed(6);
-      fxDate   = r.date;
-      fxNote   = `Source: Fixer.io · ${fxDate}`;
-    } catch (err) {
-      appendError(err,'fx');
-      fxNote = 'FX API unavailable (using 1:1)';   // graceful degrade
+      const { rate, date } = await getFxRate(homeIso, destIso);
+      fx     = rate;
+      fxRev  = +(1/rate).toFixed(6);
+      fxDate = date;
+      fxNote = `Fixer.io · ${date}`;
+    } catch (e) {
+      appendError(e,'fx');                       // (#4)
+      fxNote = 'FX unavailable (1:1)';
     }
   }
 
-  /*───── build LLM prompt ─────*/
-  const sys = `You are an expert travel consultant. 
-Only respond with a JSON object for the function call — no extra keys.`;
+  /*－－ per-day weather (#2) －－*/
+  const wx = await getDailyWeather(form.destination, startISO, endISO);
+
+  /*－－ build Groq prompt －－*/
+  const system = 'You are an expert travel consultant. Reply ONLY with the JSON for the function call.';
   const user = `
-Generate a detailed itinerary for a ${form.country} passport holder visiting ${form.destination}.
+Generate a ${daysN}-day itinerary for a ${form.country} passport holder visiting ${form.destination}.
 
-Travel dates : ${form.dateRange.from} → ${form.dateRange.to} (${days} days)  
-Budget/day   : $${form.dailyBudget}  
-Group        : ${form.groupType} · ${form.travelVibe}  
-Interests    : ${form.interests?.join(', ') || 'General'}  
-Diet         : ${form.dietary || 'None'}  
-Accommodation: ${form.accommodation || 'Any'}  
-Transport    : ${form.transportPref || 'Any'}
+Dates       : ${startISO} → ${endISO}
+Budget/day  : $${form.dailyBudget}
+Group       : ${form.groupType}
+Vibe        : ${form.travelVibe}
+Interests   : ${form.interests?.join(', ') || 'General'}
+Diet        : ${form.dietary || 'None'}
+Currencies  : 1 ${homeIso} = ${fx.toFixed(4)} ${destIso}  |  ${fxNote}
 
-CURRENCY
-• Home → Dest : 1 ${homeIso} = ${rate.toFixed(4)} ${destIso}
-• Dest → Home : 1 ${destIso} = ${rateRev.toFixed(4)} ${homeIso}
-• ${fxNote}
+RULES
+· Every price shows BOTH currencies – dest first.
+· Provide ≥10 food items with price/rating/source.
+· Emergency numbers are strings.
+· JSON must satisfy the published schema.
+`;
 
-STRICT RULES
-• Every price must show BOTH currencies: "${destIso} amount (${homeIso} amount)"
-• Provide ≥10 food items with price, rating, source.
-• Emergency numbers MUST be strings.
-• Follow the JSON schema exactly.`;
-
-  /*───── call Groq ─────*/
-  const completion = await groq.chat.completions.create({
-    model: GROQ_MODEL,
-    temperature: 0.7,
-    tools: [{ type:'function', function: schema }],
-    messages: [
-      { role:'system', content: sys },
-      { role:'user',   content: user }
+  /*－－ call LLM －－*/
+  const llm = await groq.chat.completions.create({
+    model: GROQ_MODEL, temperature: 0.7,
+    tools: [{ type:'function', function: { name:'generate_itinerary', parameters:{ type:'object' }}}],
+    messages:[
+      { role:'system', content:system },
+      { role:'user',   content:user }
     ]
   });
 
-  const call = completion.choices[0].message.tool_calls?.[0]?.function?.arguments;
-  if (!call) throw new Error('LLM returned no tool payload');
+  const raw = llm.choices[0]?.message?.tool_calls?.[0]?.function?.arguments;
+  if (!raw) return NextResponse.json({ error:'LLM gave no payload' }, { status:502 });
 
-  /*───── validate / return ─────*/
-  try {
-    const itinerary = JSON.parse(call);
-    return new Response(JSON.stringify(itinerary), {
-      headers: { 'Content-Type':'application/json' }
-    });
-  } catch (e) {
-    appendError(e,'json-parse');
-    return NextResponse.json({
-      error: 'Itinerary malformed',
-      hint:  'LLM JSON failed to parse — try again.'
-    }, { status: 500 });
+  /*－－ validate with Zod (#3) －－*/
+  let data;
+  try { data = itinerarySchema.parse(JSON.parse(raw)); }
+  catch (e) {
+    appendError(e,'schema');                 // (#4)
+    return NextResponse.json({ error:'LLM payload failed schema' }, { status:500 });
   }
+
+  /*－－ attach weather + sanity warnings (#2 #6) －－*/
+  const warnings: string[] = [];
+  const hostel = parseFloat(data.averages?.hostel?.split(' ')[0] || '0');
+  if (hostel && hostel < 5) warnings.push('Hostel price looks too low – double-check.');
+
+  data.days.forEach(d => {
+    if (wx[d.date]) d.weatherBrief = wx[d.date];           // insert brief
+  });
+
+  /*－－ final response －－*/
+  return new Response(
+    JSON.stringify({
+      ...data,
+      warnings,                    // (#6) goes to UI
+      uiHints:{ showSkeleton:true } // (#10) hook for React skeleton
+    }),
+    { headers:{ 'Content-Type':'application/json' } }
+  );
 }

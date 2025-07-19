@@ -132,7 +132,7 @@ export async function POST(req: Request) {
   /*－－ build Groq prompt －－*/
   const system = 'You are an expert travel consultant. Reply ONLY with the JSON for the function call.';
   const user = `
-Generate a ${daysN}-day itinerary for a ${form.country} passport holder visiting ${form.destination}.
+Generate a premium ${daysN}-day itinerary for a ${form.country} passport holder visiting ${form.destination}.
 
 Dates       : ${startISO} → ${endISO}
 Budget/day  : $${form.dailyBudget}
@@ -142,11 +142,38 @@ Interests   : ${form.interests?.join(', ') || 'General'}
 Diet        : ${form.dietary || 'None'}
 Currencies  : 1 ${homeIso} = ${fx.toFixed(4)} ${destIso}  |  ${fxNote}
 
-RULES
-· Every price shows BOTH currencies – dest first.
-· Provide ≥10 food items with price/rating/source.
-· Emergency numbers are strings.
-· JSON must satisfy the published schema.
+BEFORE YOU GO (≥10):
+• Provide 10-15 actionable bullet points, each starting with an imperative verb
+• Examples: "Register itinerary with embassy", "Download local transport app", 
+  "Pre-book popular attraction tickets", "Buy prepaid SIM card online"
+• Make each item specific and actionable, not generic advice
+
+VISA INFO - Include these exact keys:
+• status: "Visa required" / "Visa-free X days" / "eVisa available"
+• type: Specific visa type (e.g. "Short-stay Schengen (C)")
+• applicationCentre: Exact location/service (e.g. "VFS Global Cairo")
+• earliestApplyDate: When applications open (e.g. "6 months before travel")
+• processingTime: Realistic timeframe (e.g. "10 calendar days average")
+• feeHome: Cost in home currency
+• feeDest: Cost in destination currency
+• docs: Array of required documents
+• biometrics: Boolean and reusability info
+• tips: Pro-tips for smooth application
+
+DAILY PLAN REQUIREMENTS:
+• Minimum 8 steps per day (exclude hotel check-in/out)
+• Timeline: 06:30-23:00, no gaps >2 hours
+• Mix: landmarks, hidden gems, food stops, photo spots, evening activities
+• Every paid activity shows dual currency: "25 ${destIso} (${(25/fx).toFixed(0)} ${homeIso})"
+• Free activities: "Free (Free)"
+• End each day with "dailyTotal": "XXX ${destIso} (YYY ${homeIso})"
+
+COSTS & PRICING:
+• Every price shows BOTH currencies – destination first
+• Provide ≥10 food items with price/rating/source
+• Include grandTotalHome & grandTotalDest at root level
+• Emergency numbers are strings
+• JSON must satisfy the published schema
 `;
 
   /*－－ call LLM －－*/

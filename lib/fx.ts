@@ -19,7 +19,9 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
   const base  = (from ?? '').trim().toUpperCase();
   const quote = (to   ?? '').trim().toUpperCase();
 
-  console.log(`[FX] STARTING: Getting rate from ${base} to ${quote}`);
+  console.log(`[FX] ===== STARTING FX LOOKUP =====`);
+  console.log(`[FX] From: ${base} -> To: ${quote}`);
+  console.log(`[FX] About to call Fixer.io API...`);
 
   // same-currency shortcut
   if (!base || !quote || base === quote) {
@@ -29,6 +31,7 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
 
   // Try Fixer.io with API key
   try {
+    console.log(`[FX] Calling Fixer.io for ${base} -> ${quote}`);
     const result = await getFromFixerIo(base, quote);
     if (result) {
       console.log(`[FX] SUCCESS with Fixer.io: 1 ${base} = ${result.rate} ${quote}`);
@@ -50,11 +53,11 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
       return result;
     }
   } catch (error) {
-    console.error(`[FX] Fixer.io failed:`, error);
+    console.error(`[FX] Fixer.io FAILED with error:`, error);
   }
 
   // Fallback if Fixer.io fails
-  console.error(`[FX] Fixer.io failed for ${base}→${quote} – using fallback`);
+  console.error(`[FX] ALL APIs FAILED for ${base}→${quote} – using fallback rate 1:1`);
   return { rate: 1, date: today(), provider: 'fallback' };
 }
 
@@ -62,11 +65,14 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
 
 async function getFromFixerIo(base: string, quote: string): Promise<FxResult | null> {
   try {
+    console.log(`[FX] === FIXER.IO API CALL ===`);
     // Fixer.io API with provided API key
     const apiKey = 'e873239c9944dc25c2b59d1d01d71d77';
     const url = `https://api.fixer.io/latest?access_key=${apiKey}&base=${base}&symbols=${quote}`;
-    console.log(`[FX] Fixer.io request: ${url}`);
+    console.log(`[FX] Making HTTP request to: ${url}`);
+    console.log(`[FX] Using API key: ${apiKey}`);
     
+    console.log(`[FX] About to call fetch()...`);
     const response = await fetch(url, { 
       next: { revalidate: 300 },
       headers: {
@@ -74,17 +80,20 @@ async function getFromFixerIo(base: string, quote: string): Promise<FxResult | n
         'User-Agent': 'TripCraft/1.0'
       }
     });
+    console.log(`[FX] Fetch completed. Response status: ${response.status}`);
     
     if (!response.ok) {
-      console.error(`[FX] Fixer.io failed: ${response.status} ${response.statusText}`);
+      console.error(`[FX] Fixer.io HTTP error: ${response.status} ${response.statusText}`);
       return null;
     }
 
+    console.log(`[FX] Parsing JSON response...`);
     const data: any = await response.json();
-    console.log(`[FX] Fixer.io response:`, JSON.stringify(data, null, 2));
+    console.log(`[FX] Fixer.io full response:`, JSON.stringify(data, null, 2));
 
     if (!data.success) {
-      console.error(`[FX] Fixer.io API error:`, data.error);
+      console.error(`[FX] Fixer.io API returned success=false`);
+      console.error(`[FX] Error details:`, data.error);
       return null;
     }
 
@@ -95,6 +104,7 @@ async function getFromFixerIo(base: string, quote: string): Promise<FxResult | n
 
     const rate = data.rates[quote];
     if (!rate || isNaN(rate) || rate <= 0) {
+      console.error(`[FX] No valid rate found for ${quote} in response rates:`, data.rates);
       console.error(`[FX] Fixer.io no rate for ${quote}`);
       return null;
     }
@@ -106,7 +116,8 @@ async function getFromFixerIo(base: string, quote: string): Promise<FxResult | n
     };
 
   } catch (error) {
-    console.error(`[FX] Fixer.io request failed:`, error);
+    console.error(`[FX] Fixer.io request COMPLETELY FAILED:`, error);
+    console.error(`[FX] Error stack:`, error instanceof Error ? error.stack : 'No stack');
     return null;
   }
 }

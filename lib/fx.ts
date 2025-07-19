@@ -15,14 +15,13 @@ export async function getFxRate(
   // return cached
   if (cache[key] && now - cache[key].ts < TTL) return cache[key].rate;
 
-  const url = `https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`;
+  const url = `https://api.exchangerate.host/convert?from=${base}&to=${quote}&amount=1`;
   const res = await fetch(url, { next: { revalidate: TTL / 1000 } });
   if (!res.ok) throw new Error(`FX fetch failed ${res.status}`);
 
-  const { rates } = (await res.json()) as { rates: Record<string, number> };
-  const rate = rates?.[quote.toUpperCase()];
-  if (!rate) throw new Error('Rate not found');
+  const { result } = (await res.json()) as { result: number | null };
+  if (!result) throw new Error(`Pair ${base}/${quote} not supported`);
 
-  cache[key] = { ts: now, rate };
-  return rate;
+  cache[key] = { ts: now, rate: result };
+  return result;
 }

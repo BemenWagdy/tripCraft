@@ -166,16 +166,18 @@ export async function POST(req: Request) {
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     // Get real-time exchange rates
-    const base = form.countryCurrencyCode;          // e.g. "EGP"
-    const dest = form.destinationCurrencyCode;      // e.g. "EUR"
+    const iso = (code: string) => code.trim().toUpperCase().slice(0, 3);
+    const base = iso(form.countryCurrencyCode);          // e.g. "EGP"
+    const dest = iso(form.destinationCurrencyCode);      // e.g. "EUR"
 
     let homeToDest = 0, destToHome = 0;
     try {
       homeToDest = await getFxRate(base, dest);     // 1 EGP → EUR
       destToHome = await getFxRate(dest, base);     // 1 EUR → EGP
-    } catch (e) {
-      console.error('FX error', e);
-      // fallback to hard-coded or skip
+    } catch (err) {
+      console.warn('FX fallback', err);
+      // graceful degradation ↴
+      homeToDest = destToHome = 0;
     }
 
     const completion = await groq.chat.completions.create({
@@ -293,6 +295,20 @@ export async function POST(req: Request) {
     // Enhanced error handling for JSON parsing
     try {
       const parsedResponse = JSON.parse(toolCall.function.arguments);
+      
+      // Post-process foodList to ensure minimum 10 items
+      if (parsedResponse.foodList && parsedResponse.foodList.length < 10) {
+        while (parsedResponse.foodList.length < 10) {
+          parsedResponse.foodList.push({
+            name: `Local dish #${parsedResponse.foodList.length + 1}`,
+            note: 'Ask locals for the best spot',
+            rating: 4.0,
+            price: '—',
+            source: 'N/A'
+          });
+        }
+      }
+      
       return new Response(JSON.stringify(parsedResponse), {
         headers: { 'Content-Type': 'application/json' }
       });

@@ -1,6 +1,7 @@
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
+import { getFxRate } from '@/lib/fx';
 
 const schema = {
   name: 'generate_itinerary',
@@ -164,6 +165,19 @@ export async function POST(req: Request) {
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
+    // Get real-time exchange rates
+    const base = form.countryCurrencyCode;          // e.g. "EGP"
+    const dest = form.destinationCurrencyCode;      // e.g. "EUR"
+
+    let homeToDest = 0, destToHome = 0;
+    try {
+      homeToDest = await getFxRate(base, dest);     // 1 EGP → EUR
+      destToHome = await getFxRate(dest, base);     // 1 EUR → EGP
+    } catch (e) {
+      console.error('FX error', e);
+      // fallback to hard-coded or skip
+    }
+
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,
       temperature: 0.7,
@@ -203,8 +217,8 @@ export async function POST(req: Request) {
                - List specific requirements (photos, bank statements, etc.)
 
             2. CURRENCY & PAYMENTS - Direct exchange rates:
-               - Show ${form.country} currency to destination currency rate
-               - Show destination to ${form.country} currency rate
+               - Show ${form.country} currency to destination currency rate: ${homeToDest > 0 ? `1 ${base} = ${homeToDest.toFixed(4)} ${dest}` : 'Check current exchange rates'}
+               - Show destination to ${form.country} currency rate: ${destToHome > 0 ? `1 ${dest} = ${destToHome.toFixed(4)} ${base}` : 'Check current exchange rates'}
                - Explain local payment culture (cash vs card preference)
                - Detail tipping customs with specific amounts/percentages
                - ATM availability and fees

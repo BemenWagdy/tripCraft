@@ -185,7 +185,7 @@ export async function POST(req: Request) {
       const destToHomeResult = await getFxRate(destIso, homeIso);
       fxDestToHome = destToHomeResult.rate;
       
-      fxDate       = date;
+      fxDate       = homeToDestResult.date;
       fxNote       = `Exchange rates · updated ${fxDate}`;
       
       console.log(`[API] Exchange rates calculated:`);

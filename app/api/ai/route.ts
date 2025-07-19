@@ -220,9 +220,8 @@ export async function POST(req: Request) {
                - List specific requirements (photos, bank statements, etc.)
 
             2. CURRENCY & PAYMENTS - Direct exchange rates:
-               - Show ${form.country} currency to destination currency rate: ${homeToDest > 0 ? `1 ${base} = ${homeToDest.toFixed(4)} ${dest}` : 'Check current exchange rates'}
-               - Show ${form.country} currency to destination currency rate: ${homeToDest > 0 ? `1 ${from} = ${homeToDest.toFixed(4)} ${to}` : 'Check current exchange rates'}
-               - Show destination to ${form.country} currency rate: ${destToHome > 0 ? `1 ${to} = ${destToHome.toFixed(4)} ${from}` : 'Check current exchange rates'}
+               - Show ${form.country} currency to destination currency rate: ${fx > 0 ? `1 ${originCur} = ${fx.toFixed(4)} ${destCur}` : 'Check current exchange rates'}
+               - Show destination to ${form.country} currency rate: ${fxRev > 0 ? `1 ${destCur} = ${fxRev.toFixed(4)} ${originCur}` : 'Check current exchange rates'}
                - Explain local payment culture (cash vs card preference)
                - Detail tipping customs with specific amounts/percentages
                - ATM availability and fees

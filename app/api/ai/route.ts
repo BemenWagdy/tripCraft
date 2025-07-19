@@ -1,3 +1,5 @@
+import { getFxRate } from '@/lib/fx';
+import { currencyCode } from '@/utils/currency';
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
@@ -159,6 +161,15 @@ export async function POST(req: Request) {
 
   try {
     // Convert string dates to Date objects before calculating duration
+    const startDate = new Date(form.dateRange.from);
+    const endDate = new Date(form.dateRange.to);
+    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    /* ------------------ CURRENCY PAIR (LOGIC) ------------------ */
+    const homeIso = currencyCode(form.country) || 'USD';
+    const destIso = currencyCode(
+      (form as any).destinationCountry ?? form.destination
+    ) || 'USD';
     
     let fxHomeToDest = 1;
     let fxDestToHome = 1;

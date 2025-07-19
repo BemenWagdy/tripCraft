@@ -162,29 +162,68 @@ RULES
   const raw = llm.choices[0]?.message?.tool_calls?.[0]?.function?.arguments;
   if (!raw) return NextResponse.json({ error:'LLM gave no payload' }, { status:502 });
 
-  /*－－ validate with Zod (#3) －－*/
-  let data;
-  try { data = itinerarySchema.parse(JSON.parse(raw)); }
-  catch (e) {
-    appendError(e,'schema');                 // (#4)
-    return NextResponse.json({ error:'LLM payload failed schema' }, { status:500 });
+  /*───── validate with fixes ─────*/
+  let parsed        : any        = null;
+  let zodIssues     : string[]   = [];
+  let schemaWarnings: string[]   = [];
+
+  try {
+    const result = itinerarySchema.safeParse(JSON.parse(raw));
+    if (!result.success) {
+      // collect messages for logging / UI
+      zodIssues = result.error.issues.map(i => `${i.path.join('.')} – ${i.message}`);
+
+      // attempt best-effort fix so UI still loads
+      parsed = result.error.flatten().data ?? result.error;   // start with raw object
+      parsed = JSON.parse(raw);                               // raw LLM payload
+
+      /* auto-patch #1 – food list length */
+      if (Array.isArray(parsed.foodList) && parsed.foodList.length < 10) {
+        const n = 10 - parsed.foodList.length;
+        Array.from({ length: n }).forEach((_, idx) => {
+          parsed.foodList.push({
+            name:   `TBD local dish #${idx + 1}`,
+            note:   'Fill in later',
+            price:  `??? ${destIso} (??? ${homeIso})`,
+            rating: 4,
+            source: 'N/A'
+          });
+        });
+        schemaWarnings.push(`Added ${n} placeholder food items`);
+      }
+
+      /* auto-patch #2 – ensure price & rating exist */
+      parsed.foodList?.forEach((f: any) => {
+        if (!f.price)  { f.price  = `??? ${destIso} (??? ${homeIso})`; schemaWarnings.push('Missing price patched'); }
+        if (!f.rating) { f.rating = 4;                                   schemaWarnings.push('Missing rating patched'); }
+      });
+
+    } else {
+      parsed = result.data;   // fully valid
+    }
+  } catch (e) {
+    appendError(e,'json-parse');
+    return NextResponse.json({ error:'LLM JSON unreadable' }, { status:500 });
   }
 
-  /*－－ attach weather + sanity warnings (#2 #6) －－*/
-  const warnings: string[] = [];
-  const hostel = parseFloat(data.averages?.hostel?.split(' ')[0] || '0');
+  /*───── attach weather + cost sanity warnings ─────*/
+  const warnings: string[] = [...schemaWarnings];
+  const hostel = parseFloat(parsed.averages?.hostel?.split(' ')[0] || '0');
   if (hostel && hostel < 5) warnings.push('Hostel price looks too low – double-check.');
 
-  data.days.forEach(d => {
-    if (wx[d.date]) d.weatherBrief = wx[d.date];           // insert brief
+  parsed.days?.forEach((d: any) => {
+    if (wx[d.date]) d.weatherBrief = wx[d.date];
   });
 
-  /*－－ final response －－*/
+  /*───── log any schema problems for dev  ─────*/
+  if (zodIssues.length) appendError(new Error(zodIssues.join(' | ')),'schema');
+
+  /*───── final OK response ─────*/
   return new Response(
     JSON.stringify({
-      ...data,
-      warnings,                    // (#6) goes to UI
-      uiHints:{ showSkeleton:true } // (#10) hook for React skeleton
+      ...parsed,
+      warnings,
+      uiHints: { showSkeleton: true }
     }),
     { headers:{ 'Content-Type':'application/json' } }
   );

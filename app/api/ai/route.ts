@@ -193,31 +193,41 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid request format' }, { status: 400 });
   }
 
+  // Initialize variables with defaults to prevent undefined errors
+  let homeIso = 'USD';
+  let destIso = 'USD'; 
+  let fxHomeToDest = 1;
+  let fxDestToHome = 1;
+  let fxDate = new Date().toISOString().split('T')[0];
+  let fxNote = 'Exchange rates unavailable';
+
   try {
     // Convert string dates to Date objects before calculating duration
     const startDate = new Date(form.dateRange.from);
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    const originCur = currencyCode(form.country);
-    const destCur = currencyCode(
+    // ------------------ CURRENCY PAIR ------------------
+    homeIso = currencyCode(form.country) || 'USD';
+    destIso = currencyCode(
       // if "destination" is a city, pass a dedicated country field instead
       (form as any).destinationCountry ?? form.destination
-    );
+    ) || 'USD';
 
-    // ------------------ CURRENCY PAIR ------------------
-    const homeIso = originCur;      // e.g. "AED"
-    const destIso = destCur;        // e.g. "EGP"
-
-    let fxHomeToDest = 1;
-
-    try {
-      fxHomeToDest = await getFxRate(homeIso, destIso);
-    } catch (err) {
-      console.error('[FX] lookup failed – falling back to 1:1', err);
+    if (homeIso && destIso) {
+      try {
+        const fxResult = await getFxRate(homeIso, destIso);
+        fxHomeToDest = fxResult.rate;
+        fxDate = fxResult.date;
+        fxNote = `Exchange rates via exchangerate.host · updated ${fxDate}`;
+      } catch (err) {
+        console.error('[FX] lookup failed – falling back to 1:1', err);
+        fxHomeToDest = 1;
+      }
     }
 
-    const fxDestToHome = 1 / fxHomeToDest;
+    fxDestToHome = 1 / fxHomeToDest;
+
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,
       temperature: 0.7,

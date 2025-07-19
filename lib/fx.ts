@@ -53,14 +53,38 @@ async function call(endpoint: string): Promise<FxResult | null> {
   const url = `https://api.exchangerate.host${endpoint}`;
   try {
     const r = await fetch(url, { next: { revalidate: 60 * 60 } }); // 1 h cache
+    
+    if (!r.ok) {
+      console.error(`[FX] API request failed: ${r.status} ${r.statusText}`);
+      return null;
+    }
+    
     const j: any = await r.json();
+    
+    // Debug logging to see what the API actually returns
+    console.log(`[FX] API Response for ${endpoint}:`, JSON.stringify(j, null, 2));
+    
+    // Check if the API response indicates success
+    if (j.success === false) {
+      console.error(`[FX] API returned error:`, j.error);
+      return null;
+    }
+    
     const val = Number(j.result ?? j.info?.rate);
-    if (!val || Number.isNaN(val)) return null;
+    
+    if (!val || Number.isNaN(val) || val <= 0) {
+      console.error(`[FX] Invalid rate value:`, val, 'from response:', j);
+      return null;
+    }
+    
     const dt  = (j.date || j.info?.timestamp
                  ? new Date(j.date ?? j.info.timestamp * 1000)
                  : new Date()).toISOString().slice(0, 10);
+                 
+    console.log(`[FX] Parsed rate: ${val}, date: ${dt}`);
     return { rate: val, date: dt, provider: 'exchangerate.host' };
-  } catch {
+  } catch (error) {
+    console.error(`[FX] Request failed for ${endpoint}:`, error);
     return null;                         // swallow – we handle fallback above
   }
 }

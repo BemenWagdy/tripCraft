@@ -167,7 +167,8 @@ export async function POST(req: Request) {
 
     /* ------------------ CURRENCY PAIR (LOGIC) ------------------ */
     const homeIso = currencyCode(form.country)                       ?? 'USD';   // e.g. "EGP"
-    const destIso = currencyCode(form.destination) ?? 'USD';   // e.g. "AED"
+    const destIso = currencyCode((form as any).destinationCountry
+                   ?? form.destination)                              ?? 'USD';   // e.g. "AED"
 
     let fxHomeToDest = 1;               // forward rate  (home → dest)
     let fxDestToHome = 1;               // reverse rate  (dest → home)
@@ -226,10 +227,6 @@ export async function POST(req: Request) {
                - Show ${form.country} currency to destination currency rate: ${fxNote}
                - Show ${form.country} currency to destination currency rate: ${homeIso && destIso ? `1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}` : 'Check current exchange rates'}
                - Show destination to ${form.country} currency rate: ${destIso && homeIso ? `1 ${destIso} = ${fxDestToHome.toFixed(4)} ${homeIso}` : 'Check current exchange rates'}
-               - For the currency object, populate:
-                 * destinationCode: "${destIso}"
-                 * homeToDestination: "${homeIso && destIso ? `1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}` : 'Check current exchange rates'}"
-                 * destinationToHome: "${destIso && homeIso ? `1 ${destIso} = ${fxDestToHome.toFixed(4)} ${homeIso}` : 'Check current exchange rates'}"
                - Explain local payment culture (cash vs card preference)
                - Detail tipping customs with specific amounts/percentages
                - ATM availability and fees
@@ -371,8 +368,8 @@ export async function POST(req: Request) {
 
       currency: {
         destinationCode: destIso || 'USD',
-        homeToDestination: homeIso && destIso ? `1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}` : 'Check current exchange rates',
-        destinationToHome: destIso && homeIso ? `1 ${destIso} = ${fxDestToHome.toFixed(4)} ${homeIso}` : 'Check current exchange rates',
+        homeToDestination: `1 ${homeIso || 'USD'} = ${fxHomeToDest.toFixed(4)} ${destIso || 'USD'}`,
+        destinationToHome: `1 ${destIso || 'USD'} = ${fxDestToHome.toFixed(4)} ${homeIso || 'USD'}`,
         cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
         tippingNorms: "Research local tipping customs - varies significantly by country and service type",
         atmAvailability: "ATMs widely available in cities, may be limited in rural areas",

@@ -170,16 +170,28 @@ export async function POST(req: Request) {
     const destIso = currencyCode((form as any).destinationCountry
                    ?? form.destination)                              ?? 'USD';   // e.g. "AED"
 
-    let fxHomeToDest = 1;               // forward rate  (home → dest)
-    let fxDestToHome = 1;               // reverse rate  (dest → home)
+    let fxHomeToDest = 1;               // EGP → AED (should be ~0.074)
+    let fxDestToHome = 1;               // AED → EGP (should be ~13.46)
     let fxDate = '', fxNote = '';
 
+    console.log(`[API] Currency conversion: ${homeIso} (home) → ${destIso} (destination)`);
+
     try {
-      const { rate, date } = await getFxRate(destIso, homeIso);
-      fxDestToHome = rate;
-      fxHomeToDest = 1 / rate;
+      // Get rate from home to destination (EGP → AED)
+      const homeToDestResult = await getFxRate(homeIso, destIso);
+      fxHomeToDest = homeToDestResult.rate;
+      
+      // Get rate from destination to home (AED → EGP) 
+      const destToHomeResult = await getFxRate(destIso, homeIso);
+      fxDestToHome = destToHomeResult.rate;
+      
       fxDate       = date;
       fxNote       = `Exchange rates · updated ${fxDate}`;
+      
+      console.log(`[API] Exchange rates calculated:`);
+      console.log(`[API] 1 ${homeIso} = ${fxHomeToDest} ${destIso}`);
+      console.log(`[API] 1 ${destIso} = ${fxDestToHome} ${homeIso}`);
+      
     } catch (err) {
       console.error('[FX] lookup failed – falling back to 1 : 1', err);
     }

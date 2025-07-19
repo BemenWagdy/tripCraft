@@ -214,9 +214,15 @@ export async function POST(req: Request) {
         EGYPT: 'EGP',
         'UNITED ARAB EMIRATES': 'AED',
         UAE: 'AED',
+        DUBAI: 'AED',              // city → national currency
         BELGIUM: 'EUR',
+        BRUSSELS: 'EUR',
         USA: 'USD',
-        'UNITED STATES': 'USD'
+        'UNITED STATES': 'USD',
+        PARIS: 'EUR',
+        LONDON: 'GBP',
+        TOKYO: 'JPY',
+        SYDNEY: 'AUD'
       };
       return map[raw];
     }

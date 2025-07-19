@@ -175,9 +175,9 @@ export async function POST(req: Request) {
     let fxDate = '', fxNote = '';
 
     try {
-      const { rate, date } = await getFxRate(homeIso, destIso);
-      fxHomeToDest = rate;
-      fxDestToHome = 1 / rate;
+      const { rate, date } = await getFxRate(destIso, homeIso);
+      fxDestToHome = rate;
+      fxHomeToDest = 1 / rate;
       fxDate       = date;
       fxNote       = `Exchange rates · updated ${fxDate}`;
     } catch (err) {

@@ -1,8 +1,5 @@
 // lib/fx.ts
-// -----------------------------------------------------------------------------
-// REAL Fixer.io API integration - Uses working pattern from test
-// -----------------------------------------------------------------------------
-
+// Only Fixer.io API integration
 export interface FxResult {
   rate: number;   
   date: string;   
@@ -10,27 +7,26 @@ export interface FxResult {
 }
 
 export async function getFxRate(from: string, to: string): Promise<FxResult> {
-  const base  = (from ?? '').trim().toUpperCase();
-  const quote = (to   ?? '').trim().toUpperCase();
+  const base = (from ?? '').trim().toUpperCase();
+  const quote = (to ?? '').trim().toUpperCase();
 
-  console.log(`[FX] ===== STARTING FX LOOKUP =====`);
-  console.log(`[FX] From: ${base} -> To: ${quote}`);
+  console.log(`[FX] Getting rate from ${base} to ${quote}`);
 
-  // Same currency shortcut
+  // Same currency
   if (!base || !quote || base === quote) {
     console.log('[FX] Same currency, returning 1:1');
     return { rate: 1, date: today(), provider: 'fixer' };
   }
 
-  // MAKE REAL API REQUEST TO FIXER.IO
+  // Make real API request to Fixer.io
   const apiKey = 'e873239c9944dc25c2b59d1d01d71d77';
   
   try {
-    console.log(`[FX] 🌐 Making real API request to Fixer.io for ${base} -> ${quote}`);
+    console.log(`[FX] Making Fixer.io API request...`);
     
-    // Use EUR as base and get both currencies
+    // Get EUR rates for both currencies
     const url = `https://api.fixer.io/latest?access_key=${apiKey}&symbols=${base},${quote}`;
-    console.log(`[FX] 📡 Request URL: ${url}`);
+    console.log(`[FX] URL: ${url}`);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -40,14 +36,14 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
       }
     });
     
-    console.log(`[FX] 📡 Response status: ${response.status}`);
+    console.log(`[FX] Response status: ${response.status}`);
     
     if (!response.ok) {
       throw new Error(`Fixer.io API error: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
-    console.log(`[FX] 📦 Fixer.io response:`, JSON.stringify(data, null, 2));
+    console.log(`[FX] Fixer.io response:`, data);
     
     if (!data.success) {
       throw new Error(`Fixer.io API error: ${data.error?.info || 'Unknown error'}`);
@@ -57,16 +53,12 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
       throw new Error(`Missing rates for ${base} or ${quote} in Fixer.io response`);
     }
     
-    // Calculate cross rate: base -> quote
-    const eurToBase = data.rates[base];  // 1 EUR = X base
-    const eurToQuote = data.rates[quote]; // 1 EUR = Y quote
-    
-    // 1 base = ? quote
-    // If 1 EUR = X base and 1 EUR = Y quote
-    // Then 1 base = Y/X quote
+    // Calculate cross rate
+    const eurToBase = data.rates[base];
+    const eurToQuote = data.rates[quote];
     const rate = eurToQuote / eurToBase;
     
-    console.log(`[FX] 🧮 Calculation: 1 ${base} = ${eurToQuote}/${eurToBase} = ${rate} ${quote}`);
+    console.log(`[FX] Calculated: 1 ${base} = ${rate} ${quote}`);
     
     return {
       rate: Number(rate.toFixed(6)),
@@ -75,8 +67,8 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
     };
     
   } catch (error) {
-    console.error(`[FX] 💥 Fixer.io API request failed:`, error);
-    throw error; // Re-throw the error instead of using fallback
+    console.error(`[FX] Error:`, error);
+    throw error;
   }
 }
 

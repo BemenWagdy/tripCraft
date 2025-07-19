@@ -173,55 +173,41 @@ export async function POST(req: Request) {
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    /* ------------------ CURRENCY PAIR (LOGIC) ------------------ */
+    // Currency conversion logic
     homeIso = currencyCode(form.country) || 'USD';
     destIso = currencyCode(form.destination) || 'USD';
     
-    console.log(`[API] 🌍 Currency mapping debug:`);
-    console.log(`[API] - form.country: "${form.country}" → homeIso: "${homeIso}"`);
-    console.log(`[API] - form.destination: "${form.destination}" → destIso: "${destIso}"`);
+    console.log(`[API] Currency mapping:`);
+    console.log(`[API] Country: "${form.country}" → ${homeIso}`);
+    console.log(`[API] Destination: "${form.destination}" → ${destIso}`);
 
-    // Initialize with defaults
-    fxHomeToDest = 1;
-    fxDestToHome = 1;
-    fxDate = '';
-    fxNote = '';
-
-    console.log(`[API] Currency conversion: ${homeIso} (home) → ${destIso} (destination)`);
-
-    // Only make API calls if currencies are different and both are valid
-    if (homeIso !== destIso && homeIso !== 'USD' && destIso !== 'USD') {
-      console.log(`[API] 🌍 Making REAL Fixer.io API calls for currency conversion...`);
+    // Make API calls if currencies are different
+    if (homeIso !== destIso) {
+      console.log(`[API] Making Fixer.io API calls for ${homeIso} → ${destIso}`);
       
       try {
-        // Get rate from home to destination (EGP → AED)
-        console.log(`[API] 📞 Calling getFxRate(${homeIso}, ${destIso})`);
+        console.log(`[API] Getting ${homeIso} → ${destIso} rate`);
         const homeToDestResult = await getFxRate(homeIso, destIso);
         fxHomeToDest = homeToDestResult.rate;
-        console.log(`[API] ✅ Got ${homeIso} → ${destIso}: ${fxHomeToDest}`);
         
-        // Get rate from destination to home (AED → EGP) 
-        console.log(`[API] 📞 Calling getFxRate(${destIso}, ${homeIso})`);
+        console.log(`[API] Getting ${destIso} → ${homeIso} rate`);
         const destToHomeResult = await getFxRate(destIso, homeIso);
         fxDestToHome = destToHomeResult.rate;
-        console.log(`[API] ✅ Got ${destIso} → ${homeIso}: ${fxDestToHome}`);
         
         fxDate = homeToDestResult.date;
-        fxNote = `Exchange rates · updated ${fxDate}`;
+        fxNote = `Exchange rates updated ${fxDate}`;
         
-        console.log(`[API] Exchange rates calculated:`);
-        console.log(`[API] 1 ${homeIso} = ${fxHomeToDest} ${destIso}`);
-        console.log(`[API] 1 ${destIso} = ${fxDestToHome} ${homeIso}`);
+        console.log(`[API] Final rates: 1 ${homeIso} = ${fxHomeToDest} ${destIso}`);
+        console.log(`[API] Final rates: 1 ${destIso} = ${fxDestToHome} ${homeIso}`);
         
       } catch (err) {
-        console.error('[API] 💥 FX lookup FAILED:', err);
+        console.error('[API] FX lookup failed:', err);
         fxNote = 'Exchange rates unavailable';
       }
     } else {
-      console.log(`[API] 🔧 Skipping FX calls - Same currency or USD involved: ${homeIso} vs ${destIso}`);
-      fxNote = 'Exchange rates not applicable';
+      console.log(`[API] Same currency, no conversion needed`);
+      fxNote = 'Same currency';
     }
-    /* ----------------------------------------------------------- */
 
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,

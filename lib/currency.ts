@@ -1,59 +1,82 @@
 // lib/currency.ts
-// Enhanced currency mapping for countries and cities
+// Simple currency mapping for countries and cities
 const countryToCurrency: Record<string, string> = {
-  // GCC + MENA
+  // Egypt
+  'Egypt': 'EGP',
+  'Cairo': 'EGP',
+  'Alexandria': 'EGP',
+  'Luxor': 'EGP',
+  
+  // UAE
   'United Arab Emirates': 'AED',
   'UAE': 'AED',
   'Dubai': 'AED',
   'Abu Dhabi': 'AED',
   'Sharjah': 'AED',
-  'Egypt': 'EGP',
-  'Cairo': 'EGP',
-  'Alexandria': 'EGP',
-  'Luxor': 'EGP',
-  'Saudi Arabia': 'SAR',
-  'Saudi': 'SAR',
-  'Riyadh': 'SAR',
-  'Jeddah': 'SAR',
-  'Qatar': 'QAR',
-  'Doha': 'QAR',
-  'Kuwait': 'KWD',
-  'Kuwait City': 'KWD',
   
-  // Europe
-  'Belgium': 'EUR',
-  'France': 'EUR',
-  'Paris': 'EUR',
-  'Germany': 'EUR',
-  'Berlin': 'EUR',
-  'United Kingdom': 'GBP',
-  'UK': 'GBP',
-  'London': 'GBP',
-  'Italy': 'EUR',
-  'Rome': 'EUR',
-  'Spain': 'EUR',
-  'Madrid': 'EUR',
-  'Netherlands': 'EUR',
-  'Amsterdam': 'EUR',
-  
-  // Americas
+  // Other major currencies
   'United States': 'USD',
   'USA': 'USD',
-  'New York': 'USD',
-  'Canada': 'CAD',
-  'Toronto': 'CAD',
-  
-  // Asia-Pacific
+  'United Kingdom': 'GBP',
+  'UK': 'GBP',
+  'France': 'EUR',
+  'Germany': 'EUR',
+  'Italy': 'EUR',
+  'Spain': 'EUR',
+  'Netherlands': 'EUR',
+  'Belgium': 'EUR',
   'Japan': 'JPY',
-  'Tokyo': 'JPY',
   'Australia': 'AUD',
-  'Sydney': 'AUD',
+  'Canada': 'CAD',
+  'Switzerland': 'CHF',
+  'China': 'CNY',
+  'India': 'INR',
+  'Brazil': 'BRL',
+  'Russia': 'RUB',
+  'South Africa': 'ZAR',
+  'Mexico': 'MXN',
+  'Turkey': 'TRY',
+  'Saudi Arabia': 'SAR',
   'Thailand': 'THB',
-  'Bangkok': 'THB',
   'Singapore': 'SGD',
   'Malaysia': 'MYR',
-  'Turkey': 'TRY',
-  'Istanbul': 'TRY',
+  'Indonesia': 'IDR',
+  'Philippines': 'PHP',
+  'Vietnam': 'VND',
+  'South Korea': 'KRW',
+  'Israel': 'ILS',
+  'Norway': 'NOK',
+  'Sweden': 'SEK',
+  'Denmark': 'DKK',
+  'Poland': 'PLN',
+  'Czech Republic': 'CZK',
+  'Hungary': 'HUF',
+  'Romania': 'RON',
+  'Bulgaria': 'BGN',
+  'Croatia': 'HRK',
+  'Serbia': 'RSD',
+  'Ukraine': 'UAH',
+  'Argentina': 'ARS',
+  'Chile': 'CLP',
+  'Colombia': 'COP',
+  'Peru': 'PEN',
+  'Uruguay': 'UYU',
+  'Pakistan': 'PKR',
+  'Bangladesh': 'BDT',
+  'Sri Lanka': 'LKR',
+  'Nepal': 'NPR',
+  'Morocco': 'MAD',
+  'Tunisia': 'TND',
+  'Algeria': 'DZD',
+  'Nigeria': 'NGN',
+  'Kenya': 'KES',
+  'Ghana': 'GHS',
+  'Ethiopia': 'ETB',
+  'Tanzania': 'TZS',
+  'Uganda': 'UGX',
+  'Zambia': 'ZMW',
+  'Zimbabwe': 'ZWL',
+  'New Zealand': 'NZD',
 };
 
 export function currencyCode(country: string | undefined): string {
@@ -62,7 +85,9 @@ export function currencyCode(country: string | undefined): string {
   const trimmed = country.trim();
   
   // Already an ISO code?
-  if (trimmed.length === 3) return trimmed.toUpperCase();
+  if (trimmed.length === 3 && /^[A-Z]{3}$/.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
   
   // Direct mapping
   if (countryToCurrency[trimmed]) {
@@ -79,6 +104,6 @@ export function currencyCode(country: string | undefined): string {
     }
   }
   
-  // Fallback
+  // Fallback to USD
   return 'USD';
 }

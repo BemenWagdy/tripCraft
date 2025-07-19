@@ -1,8 +1,8 @@
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
+import { currencyCode } from '@/lib/currency';
 import { getFxRate } from '@/lib/fx';
-import { getCurrencyFromCountry, getCurrencyFromDestination } from '@/lib/currency-mapping';
 
 const schema = {
   name: 'generate_itinerary',
@@ -166,29 +166,19 @@ export async function POST(req: Request) {
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Get real-time exchange rates
     // Get currency codes from country and destination
-    const homeCurrency = getCurrencyFromCountry(form.country || '');
-    const destCurrency = getCurrencyFromDestination(form.destination || '');
-    
-    const from = homeCurrency;      // e.g. "AED"
-    const to   = destCurrency;      // e.g. "EGP"
+    const originCur = currencyCode(form.country);           // e.g. "AED"
+    const destCountry = form.destination?.split(',').slice(-1)[0]?.trim() || form.destination;
+    const destCur = currencyCode(destCountry);              // e.g. "EGP"
 
-    if (!from || !to) {
-      return new Response(
-        JSON.stringify({ error: 'homeCurrency or destCurrency missing' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    let homeToDest = 0, destToHome = 0;
+    // Get real-time exchange rates
+    let fx = 1, fxRev = 1;
     try {
-      homeToDest = await getFxRate(from, to);     // 1 AED → EGP
-      destToHome = await getFxRate(to, from);     // 1 EGP → AED
+      fx = await getFxRate(originCur, destCur);
+      fxRev = 1 / fx;
     } catch (err) {
-      console.warn('FX fallback', err);
-      // graceful degradation ↴
-      homeToDest = destToHome = 0;
+      console.error('FX error', err);
+      // fallback to USD cross-rate or leave as "N/A"
     }
 
     const completion = await groq.chat.completions.create({

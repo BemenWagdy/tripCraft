@@ -1,7 +1,7 @@
 // lib/fx.ts
 // -----------------------------------------------------------------------------
-// 100 % "won't-crash" foreign-exchange helper.
-// • Works with ~170 ISO-4217 currencies (and BTC/ETH) via exchangerate.host
+// 100% "won't-crash" foreign-exchange helper using exchangerate.host /latest API
+// • Works with ~170 ISO-4217 currencies via exchangerate.host
 // • Falls back intelligently if a direct pair is missing
 // • Never throws out of this function – you always get a numeric rate
 // -----------------------------------------------------------------------------
@@ -13,12 +13,12 @@ export interface FxResult {
 }
 
 /**
- * Fetch live FX.  Guaranteed to resolve.
+ * Fetch live FX. Guaranteed to resolve.
  * @param from ISO-4217 code – e.g. "EGP"
  * @param to   ISO-4217 code – e.g. "AED"
  */
 export async function getFxRate(from: string, to: string): Promise<FxResult> {
-  // ­­­normalise ­­­
+  // normalize
   const base  = (from ?? '').trim().toUpperCase();
   const quote = (to   ?? '').trim().toUpperCase();
 
@@ -27,65 +27,94 @@ export async function getFxRate(from: string, to: string): Promise<FxResult> {
     return { rate: 1, date: today(), provider: 'fallback' };
   }
 
-  // 1) try direct pair
-  const direct = await call(`/convert?from=${base}&to=${quote}`);
-  if (direct) return direct;
+  console.log(`[FX] Getting rate from ${base} to ${quote}`);
 
-  // 2) cross-via-USD (rare exotic pairs)
-  const leg1 = await call(`/convert?from=${base}&to=USD`);
-  const leg2 = await call(`/convert?from=USD&to=${quote}`);
-  if (leg1 && leg2) {
-    return {
-      rate: Number((leg1.rate * leg2.rate).toFixed(6)),
-      date: leg1.date,                    // both legs have the same date
-      provider: 'exchangerate.host',
-    };
+  // 1) Try getting rates with base currency
+  const direct = await getLatestRates(base, quote);
+  if (direct) {
+    console.log(`[FX] Direct rate found: 1 ${base} = ${direct.rate} ${quote}`);
+    return direct;
   }
 
-  // 3) final safety-net
-  console.error(`[FX] totally missing pair ${base}→${quote} – using 1:1.`);
+  // 2) Try USD as base and calculate cross rate
+  const usdRates = await getLatestRates('USD', null);
+  if (usdRates && usdRates.rates) {
+    const baseToUsd = usdRates.rates[base];
+    const quoteToUsd = usdRates.rates[quote];
+    
+    if (baseToUsd && quoteToUsd) {
+      // If USD rates are available, calculate cross rate
+      // Rate = (1 base / baseToUsd) * quoteToUsd = quoteToUsd / baseToUsd
+      const crossRate = quoteToUsd / baseToUsd;
+      console.log(`[FX] Cross rate calculated: 1 ${base} = ${crossRate} ${quote} (via USD)`);
+      return {
+        rate: Number(crossRate.toFixed(6)),
+        date: usdRates.date,
+        provider: 'exchangerate.host'
+      };
+    }
+  }
+
+  // 3) Final safety-net
+  console.error(`[FX] No rate found for ${base}→${quote} – using 1:1`);
   return { rate: 1, date: today(), provider: 'fallback' };
 }
 
 /* -------------------------------------------------------------------------- */
 
-async function call(endpoint: string): Promise<FxResult | null> {
-  const url = `https://api.exchangerate.host${endpoint}`;
+interface LatestRatesResponse {
+  rates: { [currency: string]: number };
+  date: string;
+}
+
+async function getLatestRates(baseCurrency: string, targetCurrency?: string | null): Promise<FxResult | LatestRatesResponse | null> {
+  const url = `https://api.exchangerate.host/latest?base=${baseCurrency}`;
+  
   try {
-    const r = await fetch(url, { next: { revalidate: 60 * 60 } }); // 1 h cache
+    console.log(`[FX] Fetching: ${url}`);
+    const response = await fetch(url, { next: { revalidate: 60 * 60 } }); // 1 hour cache
     
-    if (!r.ok) {
-      console.error(`[FX] API request failed: ${r.status} ${r.statusText}`);
+    if (!response.ok) {
+      console.error(`[FX] API request failed: ${response.status} ${response.statusText}`);
       return null;
     }
-    
-    const j: any = await r.json();
-    
-    // Debug logging to see what the API actually returns
-    console.log(`[FX] API Response for ${endpoint}:`, JSON.stringify(j, null, 2));
-    
+
+    const data: any = await response.json();
+    console.log(`[FX] API Response:`, JSON.stringify(data, null, 2));
+
     // Check if the API response indicates success
-    if (j.success === false) {
-      console.error(`[FX] API returned error:`, j.error);
+    if (data.success === false) {
+      console.error(`[FX] API returned error:`, data.error);
       return null;
     }
-    
-    const val = Number(j.result ?? j.info?.rate);
-    
-    if (!val || Number.isNaN(val) || val <= 0) {
-      console.error(`[FX] Invalid rate value:`, val, 'from response:', j);
+
+    if (!data.rates || typeof data.rates !== 'object') {
+      console.error(`[FX] Invalid response format - no rates object`);
       return null;
     }
-    
-    const dt  = (j.date || j.info?.timestamp
-                 ? new Date(j.date ?? j.info.timestamp * 1000)
-                 : new Date()).toISOString().slice(0, 10);
-                 
-    console.log(`[FX] Parsed rate: ${val}, date: ${dt}`);
-    return { rate: val, date: dt, provider: 'exchangerate.host' };
+
+    // If we're looking for a specific target currency, return FxResult
+    if (targetCurrency) {
+      const rate = data.rates[targetCurrency];
+      if (rate && !isNaN(rate) && rate > 0) {
+        return {
+          rate: Number(rate.toFixed(6)),
+          date: data.date || today(),
+          provider: 'exchangerate.host'
+        };
+      }
+      return null;
+    }
+
+    // Otherwise return the full rates response for cross-calculation
+    return {
+      rates: data.rates,
+      date: data.date || today()
+    };
+
   } catch (error) {
-    console.error(`[FX] Request failed for ${endpoint}:`, error);
-    return null;                         // swallow – we handle fallback above
+    console.error(`[FX] Request failed:`, error);
+    return null;
   }
 }
 

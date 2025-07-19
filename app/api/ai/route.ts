@@ -69,9 +69,9 @@ const itinerarySchema = z.object({
                   destinationToHome: z.string()
                 }).passthrough(),
   averages:     z.object({
-                  hostel:   z.string(),
-                  midHotel: z.string(),
-                  highEnd:  z.string()
+                  hostel:   z.number(),
+                  midHotel: z.number(),
+                  highEnd:  z.number()
                 }).optional(),
   cultureTips:  z.array(z.string()).min(5),
   foodList:     z.array(foodItem).min(10),
@@ -230,9 +230,9 @@ Return JSON ONLY, matching the function schema.`;
             averages: {
               type: 'object',
               properties: {
-                hostel: { type: 'string' },
-                midHotel: { type: 'string' },
-                highEnd: { type: 'string' }
+                hostel: { type: 'number' },
+                midHotel: { type: 'number' },
+                highEnd: { type: 'number' }
               }
             },
             cultureTips: {

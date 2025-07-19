@@ -31,8 +31,7 @@ const schema = {
       intro: { type: 'string' },
       beforeYouGo: { 
         type: 'array', 
-        items: { type: 'string' },
-        minItems: 6
+        items: { type: 'string' }
       },
       visa: {
         type: 'object',
@@ -67,8 +66,7 @@ const schema = {
       },
       cultureTips: {
         type: 'array',
-        items: { type: 'string' },
-        minItems: 5
+        items: { type: 'string' }
       },
       foodList: {
         type: 'array',
@@ -81,8 +79,7 @@ const schema = {
             source: { type: 'string' }
           },
           required: ['name', 'rating', 'source']
-        },
-        minItems: 10
+        }
       },
       practicalInfo: {
         type: 'object',
@@ -95,6 +92,7 @@ const schema = {
           healthRequirements: { type: 'string' }
         }
       },
+      tips: { type: 'string' },
       days: {
         type: 'array',
         items: {

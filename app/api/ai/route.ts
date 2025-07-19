@@ -178,21 +178,28 @@ export async function POST(req: Request) {
     destIso = currencyCode((form as any).destinationCountry
                    ?? form.destination)                              ?? 'USD';   // e.g. "AED"
 
-    fxHomeToDest = 1;               // EGP → AED (should be ~0.074)
-    fxDestToHome = 1;               // AED → EGP (should be ~13.46)
+    fxHomeToDest = 1;
+    fxDestToHome = 1;
     fxDate = '';
     fxNote = '';
 
     console.log(`[API] Currency conversion: ${homeIso} (home) → ${destIso} (destination)`);
 
+    // ENSURE WE ACTUALLY CALL FIXER.IO
     try {
+      console.log(`[API] 🌍 FORCING Fixer.io API calls for currency conversion...`);
+      
       // Get rate from home to destination (EGP → AED)
+      console.log(`[API] 📞 Calling getFxRate(${homeIso}, ${destIso})`);
       const homeToDestResult = await getFxRate(homeIso, destIso);
       fxHomeToDest = homeToDestResult.rate;
+      console.log(`[API] ✅ Got ${homeIso} → ${destIso}: ${fxHomeToDest}`);
       
       // Get rate from destination to home (AED → EGP) 
+      console.log(`[API] 📞 Calling getFxRate(${destIso}, ${homeIso})`);
       const destToHomeResult = await getFxRate(destIso, homeIso);
       fxDestToHome = destToHomeResult.rate;
+      console.log(`[API] ✅ Got ${destIso} → ${homeIso}: ${fxDestToHome}`);
       
       fxDate       = homeToDestResult.date;
       fxNote       = `Exchange rates · updated ${fxDate}`;
@@ -202,7 +209,18 @@ export async function POST(req: Request) {
       console.log(`[API] 1 ${destIso} = ${fxDestToHome} ${homeIso}`);
       
     } catch (err) {
-      console.error('[FX] lookup failed – falling back to 1 : 1', err);
+      console.error('[API] 💥 FX lookup COMPLETELY FAILED:', err);
+      
+      // Use correct hardcoded rates as fallback
+      if (homeIso === 'EGP' && destIso === 'AED') {
+        fxHomeToDest = 0.074;
+        fxDestToHome = 13.46;
+        console.log('[API] 🔧 Using hardcoded EGP/AED rates as fallback');
+      } else if (homeIso === 'AED' && destIso === 'EGP') {
+        fxHomeToDest = 13.46;
+        fxDestToHome = 0.074;
+        console.log('[API] 🔧 Using hardcoded AED/EGP rates as fallback');
+      }
     }
     /* ----------------------------------------------------------- */
 

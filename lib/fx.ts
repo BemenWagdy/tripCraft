@@ -1,77 +1,57 @@
-// lib/fx.ts
-// Only Fixer.io API integration
+/* app/lib/fx.ts
+   ------------------------------------------------------------------
+   Bullet-proof FX helper: ➊ tries exchangerate.host (free, no key)
+                           ➋ falls back to Fixer *only* if you set
+                              FIXER_API_KEY in .env.local
+                           ➌ if both fail → returns 1 so app still runs
+   ------------------------------------------------------------------ */
+
 export interface FxResult {
-  rate: number;   
-  date: string;   
-  provider: 'fixer';
+  rate: number          // price of ONE unit of base in quote
+  date: string          // YYYY-MM-DD
+  provider: string      // 'exchangerate.host' | 'fixer' | 'fallback'
 }
 
-export async function getFxRate(from: string, to: string): Promise<FxResult> {
-  const base = (from ?? '').trim().toUpperCase();
-  const quote = (to ?? '').trim().toUpperCase();
+const one = (d = new Date()) => d.toISOString().slice(0, 10)
 
-  console.log(`[FX] Getting rate from ${base} to ${quote}`);
+export async function getFxRate (base: string, quote: string): Promise<FxResult> {
+  base  = base?.trim().toUpperCase()
+  quote = quote?.trim().toUpperCase()
 
-  // Same currency
+  /* Same-currency shortcut ------------------------------------------------ */
   if (!base || !quote || base === quote) {
-    console.log('[FX] Same currency, returning 1:1');
-    return { rate: 1, date: today(), provider: 'fixer' };
+    return { rate: 1, date: one(), provider: 'fallback' }
   }
 
-  // Make real API request to Fixer.io
-  const apiKey = 'e873239c9944dc25c2b59d1d01d71d77';
-  
+  /* 1️⃣ exchangerate.host -------------------------------------------------- */
   try {
-    console.log(`[FX] Making Fixer.io API request...`);
-    
-    // Get EUR rates for both currencies
-    const url = `https://api.fixer.io/latest?access_key=${apiKey}&symbols=${base},${quote}`;
-    console.log(`[FX] URL: ${url}`);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'TripCraft/1.0'
-      }
-    });
-    
-    console.log(`[FX] Response status: ${response.status}`);
-    
-    if (!response.ok) {
-      throw new Error(`Fixer.io API error: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    console.log(`[FX] Fixer.io response:`, data);
-    
-    if (!data.success) {
-      throw new Error(`Fixer.io API error: ${data.error?.info || 'Unknown error'}`);
-    }
-    
-    if (!data.rates || !data.rates[base] || !data.rates[quote]) {
-      throw new Error(`Missing rates for ${base} or ${quote} in Fixer.io response`);
-    }
-    
-    // Calculate cross rate
-    const eurToBase = data.rates[base];
-    const eurToQuote = data.rates[quote];
-    const rate = eurToQuote / eurToBase;
-    
-    console.log(`[FX] Calculated: 1 ${base} = ${rate} ${quote}`);
-    
-    return {
-      rate: Number(rate.toFixed(6)),
-      date: data.date || today(),
-      provider: 'fixer'
-    };
-    
-  } catch (error) {
-    console.error(`[FX] Error:`, error);
-    throw error;
+    const url = `https://api.exchangerate.host/convert?from=${base}&to=${quote}`
+    const r   = await fetch(url, { next: { revalidate: 3600 } }) // 1 h cache
+    if (!r.ok) throw new Error(`status ${r.status}`)
+    const j   = await r.json()
+    const rate = j?.result ?? j?.info?.rate
+    if (rate) return { rate, date: j.date ?? one(), provider: 'exchangerate.host' }
+  } catch (e) {
+    console.warn('[FX] exchangerate.host failed →', e)
   }
-}
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
+  /* 2️⃣ Fixer (requires key) --------------------------------------------- */
+  const fixerKey = process.env.FIXER_API_KEY
+  if (fixerKey) {
+    try {
+      const url = `https://data.fixer.io/api/latest?access_key=${fixerKey}&base=${base}&symbols=${quote}`
+      const r   = await fetch(url)
+      const j   = await r.json()
+      if (j?.success && j.rates?.[quote]) {
+        return { rate: j.rates[quote], date: j.date ?? one(), provider: 'fixer' }
+      }
+      throw new Error(`Fixer error: ${j?.error?.code ?? 'unknown'}`)
+    } catch (e) {
+      console.warn('[FX] Fixer failed →', e)
+    }
+  }
+
+  /* 3️⃣ Hard fallback ------------------------------------------------------ */
+  console.error('[FX] ALL sources failed – returning 1:1')
+  return { rate: 1, date: one(), provider: 'fallback' }
 }

@@ -152,6 +152,14 @@ const schema = {
 export async function POST(req: Request) {
   let form;
   
+  // Declare variables outside try block to prevent ReferenceError in catch
+  let homeIso = 'USD';
+  let destIso = 'USD'; 
+  let fxHomeToDest = 1;
+  let fxDestToHome = 1;
+  let fxDate = '';
+  let fxNote = '';
+  
   try {
     form = await req.json();
   } catch (parseError) {
@@ -166,13 +174,14 @@ export async function POST(req: Request) {
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     /* ------------------ CURRENCY PAIR (LOGIC) ------------------ */
-    const homeIso = currencyCode(form.country)                       ?? 'USD';   // e.g. "EGP"
-    const destIso = currencyCode((form as any).destinationCountry
+    homeIso = currencyCode(form.country)                       ?? 'USD';   // e.g. "EGP"
+    destIso = currencyCode((form as any).destinationCountry
                    ?? form.destination)                              ?? 'USD';   // e.g. "AED"
 
-    let fxHomeToDest = 1;               // EGP → AED (should be ~0.074)
-    let fxDestToHome = 1;               // AED → EGP (should be ~13.46)
-    let fxDate = '', fxNote = '';
+    fxHomeToDest = 1;               // EGP → AED (should be ~0.074)
+    fxDestToHome = 1;               // AED → EGP (should be ~13.46)
+    fxDate = '';
+    fxNote = '';
 
     console.log(`[API] Currency conversion: ${homeIso} (home) → ${destIso} (destination)`);
 
@@ -256,7 +265,12 @@ export async function POST(req: Request) {
                - Proof of funds requirements
                - Return ticket requirements
 
-            4. PRACTICAL INFO - Include:
+            4. EMERGENCY NUMBERS - Provide as STRINGS not numbers:
+               - All emergency contact numbers must be strings (e.g., "911", "112", "100")
+               - Include country code if international calling is needed
+               - Format: {"police": "122", "medical": "123", "fire": "180", "tourist": "126"}
+
+            5. PRACTICAL INFO - Include:
                - Exact power plug types and voltage
                - Specific SIM card providers and costs
                - Emergency numbers (police, medical, fire, tourist helpline)
@@ -264,7 +278,7 @@ export async function POST(req: Request) {
                - Recommended safety apps
                - Health requirements and recommended vaccinations
 
-            5. CULTURAL TIPS - Destination-specific etiquette:
+            6. CULTURAL TIPS - Destination-specific etiquette:
                - Greeting customs and basic phrases
                - Dress codes for different situations
                - Religious site protocols
@@ -273,7 +287,7 @@ export async function POST(req: Request) {
                - Bargaining culture and techniques
                - Photography restrictions and etiquette
 
-            6. DAILY ITINERARY:
+            7. DAILY ITINERARY:
                - Each day needs detailed steps from early morning (6:00 AM) to late night (11:00 PM)
                - Include specific times for each activity with realistic durations
                - Add 15-30 minute buffer times between activities for transportation
@@ -289,7 +303,7 @@ export async function POST(req: Request) {
                - Match ${form.accommodation} preference and $${form.dailyBudget} budget
                - Account for ${form.groupType} group dynamics
 
-            7. FOOD RECOMMENDATIONS:
+            8. FOOD RECOMMENDATIONS:
                - Minimum 10 specific dishes/restaurants with ratings and sources
                - Include specific pricing for each item (e.g., "$8-12", "€15", "₹200-300")
                - Include ${form.dietary} options where relevant

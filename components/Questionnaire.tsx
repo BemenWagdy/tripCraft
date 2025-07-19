@@ -123,6 +123,20 @@ export default function Questionnaire() {
         body: JSON.stringify(formData)
       });
 
+      // Handle non-JSON or error responses gracefully
+      if (!response.ok) {
+        let errorMessage = 'Failed to generate itinerary';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // If response is not JSON, get text
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await response.json();
       setItinerary(JSON.stringify(data));
     } catch (err) {

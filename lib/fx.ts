@@ -39,13 +39,35 @@ export async function getFxRate (base: string, quote: string): Promise<FxResult>
   const fixerKey = process.env.FIXER_API_KEY
   if (fixerKey) {
     try {
-      const url = `https://data.fixer.io/api/latest?access_key=${fixerKey}&base=${base}&symbols=${quote}`
-      const r   = await fetch(url)
-      const j   = await r.json()
-      if (j?.success && j.rates?.[quote]) {
-        return { rate: j.rates[quote], date: j.date ?? one(), provider: 'fixer' }
+      // Free plan only supports EUR base, so handle conversions accordingly
+      if (base === 'EUR') {
+        // Direct EUR to quote conversion
+        const url = `https://data.fixer.io/api/latest?access_key=${fixerKey}&symbols=${quote}`
+        const r = await fetch(url)
+        const j = await r.json()
+        if (j?.success && j.rates?.[quote]) {
+          return { rate: j.rates[quote], date: j.date ?? one(), provider: 'fixer' }
+        }
+      } else if (quote === 'EUR') {
+        // Base to EUR conversion (need inverse)
+        const url = `https://data.fixer.io/api/latest?access_key=${fixerKey}&symbols=${base}`
+        const r = await fetch(url)
+        const j = await r.json()
+        if (j?.success && j.rates?.[base]) {
+          return { rate: 1 / j.rates[base], date: j.date ?? one(), provider: 'fixer' }
+        }
+      } else {
+        // Cross-currency conversion via EUR: base→EUR→quote
+        const url = `https://data.fixer.io/api/latest?access_key=${fixerKey}&symbols=${base},${quote}`
+        const r = await fetch(url)
+        const j = await r.json()
+        if (j?.success && j.rates?.[base] && j.rates?.[quote]) {
+          // Rate = (1/baseToEur) * eurToQuote = quote/base
+          const rate = j.rates[quote] / j.rates[base]
+          return { rate, date: j.date ?? one(), provider: 'fixer' }
+        }
       }
-      throw new Error(`Fixer error: ${j?.error?.code ?? 'unknown'}`)
+      throw new Error(`Fixer error: Missing rate data`)
     } catch (e) {
       console.warn('[FX] Fixer failed →', e)
     }

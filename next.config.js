@@ -7,7 +7,7 @@ const nextConfig = {
   images: { unoptimized: true },
   optimizeFonts: false, // Disable font optimization to prevent AbortError during build
   webpack(config) {
-    // config.cache = false;     // ← commented out as it causes manifest corruption
+    config.cache = false;     // ← uncommented to fix WebAssembly memory allocation error
     
     // Add fallback for encoding module to resolve node-fetch compatibility issues
     config.resolve.fallback = {

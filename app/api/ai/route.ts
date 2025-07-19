@@ -166,19 +166,23 @@ export async function POST(req: Request) {
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Get currency codes from country and destination
-    const originCur = currencyCode(form.country);           // e.g. "AED"
-    const destCountry = form.destination?.split(',').slice(-1)[0]?.trim() || form.destination;
-    const destCur = currencyCode(destCountry);              // e.g. "EGP"
+    const originCur = currencyCode(form.country);
+    const destCur = currencyCode(
+      // if "destination" is a city, pass a dedicated country field instead
+      (form as any).destinationCountry ?? form.destination
+    );
 
-    // Get real-time exchange rates
     let fx = 1, fxRev = 1;
-    try {
-      fx = await getFxRate(originCur, destCur);
-      fxRev = 1 / fx;
-    } catch (err) {
-      console.error('FX error', err);
-      // fallback to USD cross-rate or leave as "N/A"
+    let fxNote = 'live rate unavailable';
+
+    if (originCur && destCur && originCur !== destCur) {
+      try {
+        fx = await getFxRate(originCur, destCur); // e.g. AED ➜ EGP
+        fxRev = 1 / fx;
+        fxNote = `1 ${originCur} ≈ ${fx.toFixed(2)} ${destCur}`;
+      } catch (err) {
+        console.error('FX fetch failed →', err);
+      }
     }
 
     const completion = await groq.chat.completions.create({

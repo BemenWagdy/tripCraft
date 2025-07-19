@@ -1,68 +1,30 @@
-// VERY small lookup table – add more as you go
-const MAP: Record<string, string> = {
-  Egypt: 'EGP',
-  Belgium: 'EUR',
+// lib/currency.ts
+// Very small starter map – expand as you support more passports.
+const countryToCurrency: Record<string, string> = {
+  // GCC + MENA
   'United Arab Emirates': 'AED',
-  'United States': 'USD',
-  'United Kingdom': 'GBP',
-  Canada: 'CAD',
-  Australia: 'AUD',
-  Germany: 'EUR',
+  UAE: 'AED',
+  Egypt: 'EGP',
+  Saudi: 'SAR',
+  Qatar: 'QAR',
+  Kuwait: 'KWD',
+
+  // Europe
+  Belgium: 'EUR',
   France: 'EUR',
-  Italy: 'EUR',
-  Spain: 'EUR',
-  Netherlands: 'EUR',
+  Germany: 'EUR',
+  'United Kingdom': 'GBP',
+
+  // Americas
+  'United States': 'USD',
+  Canada: 'CAD',
+
+  // Asia-Pacific
   Japan: 'JPY',
-  China: 'CNY',
-  India: 'INR',
-  Brazil: 'BRL',
-  Mexico: 'MXN',
-  Russia: 'RUB',
-  Turkey: 'TRY',
-  'South Africa': 'ZAR',
-  'Saudi Arabia': 'SAR',
-  Israel: 'ILS',
-  Thailand: 'THB',
-  Singapore: 'SGD',
-  Malaysia: 'MYR',
-  Indonesia: 'IDR',
-  Philippines: 'PHP',
-  'South Korea': 'KRW',
-  'Hong Kong': 'HKD',
-  Taiwan: 'TWD',
-  Switzerland: 'CHF',
-  Norway: 'NOK',
-  Sweden: 'SEK',
-  Denmark: 'DKK',
-  Poland: 'PLN',
-  'Czech Republic': 'CZK',
-  Hungary: 'HUF',
-  Romania: 'RON',
-  Bulgaria: 'BGN',
-  Croatia: 'EUR',
-  Greece: 'EUR',
-  Portugal: 'EUR',
-  Ireland: 'EUR',
-  Finland: 'EUR',
-  Austria: 'EUR',
-  'New Zealand': 'NZD',
-  Chile: 'CLP',
-  Argentina: 'ARS',
-  Colombia: 'COP',
-  Peru: 'PEN',
-  Ukraine: 'UAH',
-  Kazakhstan: 'KZT',
-  Morocco: 'MAD',
-  Tunisia: 'TND',
-  Algeria: 'DZD',
-  Nigeria: 'NGN',
-  Kenya: 'KES',
-  Ghana: 'GHS',
-  Ethiopia: 'ETB',
-  // …
+  Australia: 'AUD',
 };
 
-/**Return ISO 4217 code (e.g. "EGP") or empty string if unknown*/
-export function currencyCode(countryName: string): string {
-  return MAP[countryName] ?? '';
+export function currencyCode(country: string | undefined): string {
+  if (!country) return '';
+  return countryToCurrency[country.trim()] ?? '';
 }

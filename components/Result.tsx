@@ -409,14 +409,14 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
         )}
 
         {/* Daily Itinerary */}
-        {data.days && data.days.map((day: any, index: number) => (
+        {data.days && Array.isArray(data.days) && data.days.map((day: any, index: number) => (
           <div key={index}>
             <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2">
               <Calendar className="h-5 w-5 text-primary" />
               Day {index + 1} – {day.title} ({day.date})
             </h2>
             <ul className="space-y-3 mb-4">
-              {day.steps && day.steps.map((step: any, stepIndex: number) => (
+              {day.steps && Array.isArray(day.steps) && day.steps.map((step: any, stepIndex: number) => (
                 <li key={stepIndex} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     <span className="text-gray-700">

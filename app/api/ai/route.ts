@@ -410,9 +410,9 @@ export async function POST(req: Request) {
       },
 
       currency: {
-        destinationCode: destIso,
-        homeToDestination: `1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}`,
-        destinationToHome: `1 ${destIso} = ${fxDestToHome.toFixed(4)} ${homeIso}`,
+        destinationCode: destIso || 'USD',
+        homeToDestination: `1 ${homeIso || 'USD'} = ${fxHomeToDest.toFixed(4)} ${destIso || 'USD'}`,
+        destinationToHome: `1 ${destIso || 'USD'} = ${fxDestToHome.toFixed(4)} ${homeIso || 'USD'}`,
         cashCulture: "Research local payment preferences - some places prefer cash, others accept cards widely",
         tippingNorms: "Research local tipping customs - varies significantly by country and service type",
         atmAvailability: "ATMs widely available in cities, may be limited in rural areas",
@@ -505,7 +505,8 @@ export async function POST(req: Request) {
         };
       }),
 
-      totalCost: `$${(form?.dailyBudget || 100) * duration}`
+      totalCost: `$${(form?.dailyBudget || 100) * duration}`,
+      lastUpdated: fxDate
     };
 
     return new Response(

@@ -1,84 +1,84 @@
 // lib/currency.ts
-// Very small starter map – expand as you support more passports.
+// Enhanced currency mapping for countries and cities
 const countryToCurrency: Record<string, string> = {
   // GCC + MENA
   'United Arab Emirates': 'AED',
-  UAE: 'AED',
-  Dubai: 'AED',
+  'UAE': 'AED',
+  'Dubai': 'AED',
   'Abu Dhabi': 'AED',
-  Sharjah: 'AED',
-  Egypt: 'EGP',
-  Cairo: 'EGP',
-  Alexandria: 'EGP',
-  Luxor: 'EGP',
-  Saudi: 'SAR',
+  'Sharjah': 'AED',
+  'Egypt': 'EGP',
+  'Cairo': 'EGP',
+  'Alexandria': 'EGP',
+  'Luxor': 'EGP',
   'Saudi Arabia': 'SAR',
-  Riyadh: 'SAR',
-  Jeddah: 'SAR',
-  Mecca: 'SAR',
-  Qatar: 'QAR',
-  Doha: 'QAR',
-  Kuwait: 'KWD',
+  'Saudi': 'SAR',
+  'Riyadh': 'SAR',
+  'Jeddah': 'SAR',
+  'Qatar': 'QAR',
+  'Doha': 'QAR',
+  'Kuwait': 'KWD',
   'Kuwait City': 'KWD',
-
+  
   // Europe
-  Belgium: 'EUR',
-  France: 'EUR',
-  Paris: 'EUR',
-  Lyon: 'EUR',
-  Marseille: 'EUR',
-  Germany: 'EUR',
-  Berlin: 'EUR',
-  Munich: 'EUR',
-  Frankfurt: 'EUR',
+  'Belgium': 'EUR',
+  'France': 'EUR',
+  'Paris': 'EUR',
+  'Germany': 'EUR',
+  'Berlin': 'EUR',
   'United Kingdom': 'GBP',
-  UK: 'GBP',
-  London: 'GBP',
-  Manchester: 'GBP',
-  Edinburgh: 'GBP',
-  Italy: 'EUR',
-  Rome: 'EUR',
-  Milan: 'EUR',
-  Venice: 'EUR',
-  Spain: 'EUR',
-  Madrid: 'EUR',
-  Barcelona: 'EUR',
-  Netherlands: 'EUR',
-  Amsterdam: 'EUR',
-
+  'UK': 'GBP',
+  'London': 'GBP',
+  'Italy': 'EUR',
+  'Rome': 'EUR',
+  'Spain': 'EUR',
+  'Madrid': 'EUR',
+  'Netherlands': 'EUR',
+  'Amsterdam': 'EUR',
+  
   // Americas
   'United States': 'USD',
-  USA: 'USD',
+  'USA': 'USD',
   'New York': 'USD',
-  'Los Angeles': 'USD',
-  Chicago: 'USD',
-  Miami: 'USD',
-  Canada: 'CAD',
-  Toronto: 'CAD',
-  Vancouver: 'CAD',
-  Montreal: 'CAD',
-
+  'Canada': 'CAD',
+  'Toronto': 'CAD',
+  
   // Asia-Pacific
-  Japan: 'JPY',
-  Tokyo: 'JPY',
-  Osaka: 'JPY',
-  Kyoto: 'JPY',
-  Australia: 'AUD',
-  Sydney: 'AUD',
-  Melbourne: 'AUD',
-  Perth: 'AUD',
-  Thailand: 'THB',
-  Bangkok: 'THB',
-  'Phuket': 'THB',
-  Singapore: 'SGD',
-  Malaysia: 'MYR',
-  'Kuala Lumpur': 'MYR',
-  Turkey: 'TRY',
-  Istanbul: 'TRY',
-  Ankara: 'TRY',
+  'Japan': 'JPY',
+  'Tokyo': 'JPY',
+  'Australia': 'AUD',
+  'Sydney': 'AUD',
+  'Thailand': 'THB',
+  'Bangkok': 'THB',
+  'Singapore': 'SGD',
+  'Malaysia': 'MYR',
+  'Turkey': 'TRY',
+  'Istanbul': 'TRY',
 };
 
 export function currencyCode(country: string | undefined): string {
-  if (!country) return '';
-  return countryToCurrency[country.trim()] ?? '';
+  if (!country) return 'USD';
+  
+  const trimmed = country.trim();
+  
+  // Already an ISO code?
+  if (trimmed.length === 3) return trimmed.toUpperCase();
+  
+  // Direct mapping
+  if (countryToCurrency[trimmed]) {
+    return countryToCurrency[trimmed];
+  }
+  
+  // Try to extract country from "City, Country" format
+  if (trimmed.includes(',')) {
+    const parts = trimmed.split(',').map(p => p.trim());
+    for (const part of parts) {
+      if (countryToCurrency[part]) {
+        return countryToCurrency[part];
+      }
+    }
+  }
+  
+  // Fallback
+  return 'USD';
 }

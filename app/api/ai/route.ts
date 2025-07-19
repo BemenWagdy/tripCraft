@@ -1,40 +1,6 @@
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
-import { getFxRate } from '@/lib/fx';
-
-/** Very small subset – expand as you like */
-const COUNTRY_TO_CURRENCY: Record<string, string> = {
-  // Common countries
-  'United Arab Emirates': 'AED',
-  'UAE': 'AED',
-  'Egypt': 'EGP',
-  'United States': 'USD',
-  'United Kingdom': 'GBP',
-  'Belgium': 'EUR',
-  'France': 'EUR', 
-  'Germany': 'EUR',
-  'Canada': 'CAD',
-  'Japan': 'JPY',
-  'Australia': 'AUD',
-  'Saudi Arabia': 'SAR',
-  'Qatar': 'QAR',
-  'Kuwait': 'KWD',
-};
-
-/** Helper: try form.currency first, else map nationality/destination */
-function pickCurrency(countryName: string): string {
-  if (!countryName) return 'USD'; // fallback
-  
-  const currency = COUNTRY_TO_CURRENCY[countryName.trim()];
-  if (currency) return currency;
-  
-  // Try currencyCode as fallback
-  const currencyFromCode = currencyCode(countryName);
-  if (currencyFromCode) return currencyFromCode;
-  
-  return 'USD'; // final fallback
-}
 
 const schema = {
   name: 'generate_itinerary',
@@ -193,39 +159,6 @@ export async function POST(req: Request) {
 
   try {
     // Convert string dates to Date objects before calculating duration
-    const startDate = new Date(form.dateRange.from);
-    const endDate = new Date(form.dateRange.to);
-    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    /* ------------------ CURRENCY PAIR (LOGIC) ------------------ */
-    /**
-     * Very small helper that converts a country-name OR ISO code into
-     * a 3-letter ISO-4217 currency.  Extend the map as you wish.
-     */
-    function currencyCode(input?: string): string | undefined {
-      if (!input) return;
-      const raw = input.trim().toUpperCase();
-    
-      // already an ISO-4217 code?
-      if (raw.length === 3) return raw;
-    
-      // minimal fallback map
-      const map: Record<string, string> = {
-        EGYPT: 'EGP',
-        'UNITED ARAB EMIRATES': 'AED',
-        UAE: 'AED',
-        BELGIUM: 'EUR',
-        USA: 'USD',
-        'UNITED STATES': 'USD'
-      };
-      return map[raw];
-    }
-    
-    let homeIso  = currencyCode(form.country) ||
-                   'USD'; // final fallback
-    let destIso  = currencyCode(
-                    (form as any).destinationCountry ?? form.destination
-                  ) || 'USD';
     
     let fxHomeToDest = 1;
     let fxDestToHome = 1;

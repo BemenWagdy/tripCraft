@@ -51,8 +51,7 @@ async function getDailyWeather(
 /*─────────────────────── 1 · JSON schema (Zod) ─────────────────────────*/
 const foodItem = z.object({
   name:   z.string(),
-  note:   z.string(),
-  price:  z.string(),
+  note:   z.string().optional(),
   rating: z.number(),
   source: z.string()
 });
@@ -61,7 +60,13 @@ const itinerarySchema = z.object({
   beforeYouGo:  z.array(z.string()).min(6),
   visa:         z.object({
                   required: z.boolean(),
-                  type:     z.string()
+                  type:     z.string(),
+                  applicationMethod: z.string().optional(),
+                  processingTime: z.string().optional(),
+                  fee: z.string().optional(),
+                  validityPeriod: z.string().optional(),
+                  appointmentWarning: z.string().optional(),
+                  additionalRequirements: z.string().optional()
                 }).passthrough(),
   currency:     z.object({
                   destinationCode:   z.string(),
@@ -75,7 +80,14 @@ const itinerarySchema = z.object({
                 }).optional(),
   cultureTips:  z.array(z.string()).min(5),
   foodList:     z.array(foodItem).min(10),
-  practicalInfo:z.record(z.any()).optional(),
+  practicalInfo:z.object({
+                  powerPlugType: z.string().optional(),
+                  simCardOptions: z.string().optional(),
+                  emergencyNumbers: z.string().optional(),
+                  commonScams: z.string().optional(),
+                  safetyApps: z.string().optional(),
+                  healthRequirements: z.string().optional()
+                }).optional(),
   days: z.array(
           z.object({
             date:  z.string(),
@@ -149,7 +161,7 @@ Begin the JSON with **intro** that is exactly **2–4 lively sentences** about
 ${form.destination}: vibe, 1-line history, why 2025 is a great time to go.
 
 ──────────────── BEFORE-YOU-GO ───────────
-Return **10–12 HARD-ACTION bullet points**, each:
+Return **at least 6 HARD-ACTION bullet points**, each:
 • Tailored (mention city / country when relevant, no "generic" advice)  
 • Starts with a verb in the imperative  
 • Gives enough detail that a traveller could act on it today  
@@ -162,20 +174,18 @@ Return **10–12 HARD-ACTION bullet points**, each:
 - "Buy *Schloss Nymphenburg* e-ticket slot (09:00 or 09:30 sell out fast)"
 
 ──────────────── VISA ­ ───────────────
-Return a **visa** object with ALL of these keys:  
+Return a **visa** object with these keys:  
 
 | key | what to return |  
 | --- | --- |  
-| status            | "Visa required" / "Visa-free X days" / "eVisa" |  
+| required          | boolean - true if visa required |  
 | type              | e.g. "Short-stay Schengen (C)" |  
-| applicationCentre | e.g. "VFS Global Cairo – Schengen lane" |  
-| earliestApplyDate | "6 months before entry" |  
-| processingTime    | "10 calendar days (avg Cairo centre)" |  
-| feeHome           | "€80 (${homeIso} equivalent)" |  
-| feeDest           | same amount shown in ${destIso} |  
-| docs              | array of EXACT docs ("biometric photo 35×45 mm", …) |  
-| biometrics        | "Yes – fingerprints valid 59 months" / "No" |  
-| tips              | 1-2 insider tips ("slots open midnight Cairo time") |
+| applicationMethod | optional - where/how to apply |  
+| processingTime    | optional - "10 calendar days" |  
+| fee               | optional - cost in dual currency |  
+| validityPeriod    | optional - how long visa is valid |  
+| appointmentWarning| optional - booking tips |  
+| additionalRequirements | optional - special docs |
 
 ──────────────── CURRENCY ───────────────
 Home → Dest: 1 ${homeIso} = ${fx.toFixed(4)} ${destIso}  
@@ -195,7 +205,9 @@ Return JSON ONLY, matching the function schema.`;
   /* ───────────── END USER PROMPT ───────────── */
 
   /*－－ call LLM －－*/
-  const llm = await groq.chat.completions.create({
+  let llm;
+  try {
+    llm = await groq.chat.completions.create({
     model: GROQ_MODEL, temperature: 0.7,
     tools: [{ 
       type: 'function', 
@@ -214,7 +226,13 @@ Return JSON ONLY, matching the function schema.`;
               type: 'object',
               properties: {
                 required: { type: 'boolean' },
-                type: { type: 'string' }
+                type: { type: 'string' },
+                applicationMethod: { type: 'string' },
+                processingTime: { type: 'string' },
+                fee: { type: 'string' },
+                validityPeriod: { type: 'string' },
+                appointmentWarning: { type: 'string' },
+                additionalRequirements: { type: 'string' }
               },
               required: ['required', 'type']
             },
@@ -247,13 +265,23 @@ Return JSON ONLY, matching the function schema.`;
                 properties: {
                   name: { type: 'string' },
                   note: { type: 'string' },
-                  price: { type: 'string' },
                   rating: { type: 'number' },
                   source: { type: 'string' }
                 },
-                required: ['name', 'note', 'price', 'rating', 'source']
+                required: ['name', 'rating', 'source']
               },
               minItems: 10
+            },
+            practicalInfo: {
+              type: 'object',
+              properties: {
+                powerPlugType: { type: 'string' },
+                simCardOptions: { type: 'string' },
+                emergencyNumbers: { type: 'string' },
+                commonScams: { type: 'string' },
+                safetyApps: { type: 'string' },
+                healthRequirements: { type: 'string' }
+              }
             },
             days: {
               type: 'array',
@@ -289,10 +317,17 @@ Return JSON ONLY, matching the function schema.`;
       { role:'system', content:system },
       { role:'user',   content:user }
     ]
-  });
+    });
+  } catch (e) {
+    appendError(e, 'groq-api');
+    return NextResponse.json({ error: 'AI service temporarily unavailable. Please try again.' }, { status: 502 });
+  }
 
   const raw = llm.choices[0]?.message?.tool_calls?.[0]?.function?.arguments;
-  if (!raw) return NextResponse.json({ error:'LLM gave no payload' }, { status:502 });
+  if (!raw) {
+    appendError(new Error('LLM gave no payload'), 'groq-empty');
+    return NextResponse.json({ error:'AI service gave no response. Please try again.' }, { status:502 });
+  }
 
   /*───── validate with fixes ─────*/
   let parsed        : any        = null;
@@ -316,7 +351,6 @@ Return JSON ONLY, matching the function schema.`;
           parsed.foodList.push({
             name:   `TBD local dish #${idx + 1}`,
             note:   'Fill in later',
-            price:  `??? ${destIso} (??? ${homeIso})`,
             rating: 4,
             source: 'N/A'
           });
@@ -326,7 +360,6 @@ Return JSON ONLY, matching the function schema.`;
 
       /* auto-patch #2 – ensure price & rating exist */
       parsed.foodList?.forEach((f: any) => {
-        if (!f.price)  { f.price  = `??? ${destIso} (??? ${homeIso})`; schemaWarnings.push('Missing price patched'); }
         if (!f.rating) { f.rating = 4;                                   schemaWarnings.push('Missing rating patched'); }
       });
 

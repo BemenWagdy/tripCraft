@@ -51,41 +51,42 @@ async function getDailyWeather(
 /*─────────────────────── 1 · JSON schema (Zod) ─────────────────────────*/
 const foodItem = z.object({
   name:   z.string(),
-  note:   z.string(),
-  price:  z.string(),
+  note:   z.string().optional(),
   rating: z.number(),
   source: z.string()
 });
 const itinerarySchema = z.object({
   intro:        z.string(),
-  beforeYouGo:  z.array(z.string()).min(6),
+  beforeYouGo:  z.array(z.string()).optional(),
   visa:         z.object({
                   required: z.boolean(),
                   type:     z.string()
-                }).passthrough(),
+                }).passthrough().optional(),
   currency:     z.object({
                   destinationCode:   z.string(),
                   homeToDestination: z.string(),
                   destinationToHome: z.string()
-                }).passthrough(),
+                }).passthrough().optional(),
   averages:     z.object({
                   hostel:   z.string(),
                   midHotel: z.string(),
                   highEnd:  z.string()
                 }).optional(),
-  cultureTips:  z.array(z.string()).min(5),
-  foodList:     z.array(foodItem).min(10),
+  cultureTips:  z.array(z.string()).optional(),
+  foodList:     z.array(foodItem).optional(),
   practicalInfo:z.record(z.any()).optional(),
+  weather:      z.string().optional(),
+  tips:         z.string().optional(),
   days: z.array(
           z.object({
             date:  z.string(),
             title: z.string(),
             steps: z.array(z.object({
-              time: z.string(),
+              time: z.string().optional(),
               text: z.string()
-            }))
+            })).optional()
           })
-        ),
+        ).optional(),
   totalCost:            z.string().optional(),
   totalCostLocal:       z.string().optional(),
   totalCostDestination: z.string().optional()

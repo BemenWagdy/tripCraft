@@ -172,19 +172,19 @@ export async function POST(req: Request) {
       (form as any).destinationCountry ?? form.destination
     );
 
-    let fx = 1, fxRev = 1;
-    let fxNote = 'live rate unavailable';
+    // ------------------ CURRENCY PAIR ------------------
+    const homeIso = originCur;      // e.g. "AED"
+    const destIso = destCur;        // e.g. "EGP"
 
-    if (originCur && destCur && originCur !== destCur) {
-      try {
-        fx = await getFxRate(originCur, destCur); // e.g. AED ➜ EGP
-        fxRev = 1 / fx;
-        fxNote = `1 ${originCur} ≈ ${fx.toFixed(2)} ${destCur}`;
-      } catch (err) {
-        console.error('FX fetch failed →', err);
-      }
+    let fxHomeToDest = 1;
+
+    try {
+      fxHomeToDest = await getFxRate(homeIso, destIso);
+    } catch (err) {
+      console.error('[FX] lookup failed – falling back to 1:1', err);
     }
 
+    const fxDestToHome = 1 / fxHomeToDest;
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,
       temperature: 0.7,

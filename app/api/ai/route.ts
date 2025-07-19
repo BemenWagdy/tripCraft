@@ -333,9 +333,19 @@ export async function POST(req: Request) {
             - Every cost must show both currencies: destination currency first, then home currency in parentheses
             - Use the exchange rates provided: 1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}
             - Format: "Amount ${destIso} (Amount ${homeIso})"
-            - Example: hostel: "50 EGP (1.25 USD)", midHotel: "200 EGP (5.00 USD)", highEnd: "800 EGP (20.00 USD)"
+            - ACCOMMODATION EXAMPLES for ${form.destination}:
+              * hostel: "45 EGP (1.13 USD)" - Research actual hostel prices in ${form.destination}
+              * midHotel: "280 EGP (7.00 USD)" - Research actual 3-4 star hotel prices in ${form.destination}  
+              * highEnd: "1200 EGP (30.00 USD)" - Research actual luxury hotel prices in ${form.destination}
             - Include costs for: meals, transportation, activities, accommodations, tips, shopping
             - Show daily totals and grand total in both currencies
+            
+            ACCOMMODATION PRICING VERIFICATION:
+            - Cross-reference multiple sources: Booking.com, Hotels.com, Agoda, local booking sites
+            - Use current ${form.destination} market rates, not outdated or generic pricing
+            - Consider ${form.accommodation} preference when calculating averages
+            - Factor in ${form.dateRange.from} to ${form.dateRange.to} seasonal pricing
+            - Distinguish between city center and peripheral area pricing
 
             Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
           `

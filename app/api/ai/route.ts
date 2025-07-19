@@ -1,5 +1,5 @@
 import { getFxRate } from '@/lib/fx';
-import { currencyCode } from '@/utils/currency';
+import { currencyCode } from '@/lib/currency';
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
@@ -166,30 +166,22 @@ export async function POST(req: Request) {
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     /* ------------------ CURRENCY PAIR (LOGIC) ------------------ */
-    const homeIso = currencyCode(form.country) || 'USD';
-    const destIso = currencyCode(
-      (form as any).destinationCountry ?? form.destination
-    ) || 'USD';
-    
-    homeIso ||= 'USD';
-    destIso ||= 'USD';
-    
-    let fxHomeToDest = 1;
-    let fxDestToHome = 1;
-    let fxDate       = '';
-    let fxNote       = 'Exchange rate unavailable';
-    
-    if (homeIso && destIso) {               // 🟢 guard to prevent empty string calls
-      console.log('[FX] pair', homeIso, '→', destIso);
-      try {
-        const { rate, date } = await getFxRate(homeIso, destIso);
-        fxHomeToDest = rate;
-        fxDestToHome = 1 / rate;
-        fxDate       = date;
-        fxNote       = `Exchange rates · updated ${fxDate}`;
-      } catch (err) {
-        console.error('[FX] lookup failed – falling back to 1 : 1', err);
-      }
+    const homeIso = currencyCode(form.country)                       ?? 'USD';   // e.g. "EGP"
+    const destIso = currencyCode((form as any).destinationCountry
+                   ?? form.destination)                              ?? 'USD';   // e.g. "AED"
+
+    let fxHomeToDest = 1;               // forward rate  (home → dest)
+    let fxDestToHome = 1;               // reverse rate  (dest → home)
+    let fxDate = '', fxNote = '';
+
+    try {
+      const { rate, date } = await getFxRate(homeIso, destIso);
+      fxHomeToDest = rate;
+      fxDestToHome = 1 / rate;
+      fxDate       = date;
+      fxNote       = `Exchange rates · updated ${fxDate}`;
+    } catch (err) {
+      console.error('[FX] lookup failed – falling back to 1 : 1', err);
     }
     /* ----------------------------------------------------------- */
 

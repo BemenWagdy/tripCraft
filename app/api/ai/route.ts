@@ -1,8 +1,8 @@
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
-import { currencyCode } from '@/lib/currency';
 import { getFxRate } from '@/lib/fx';
+import { currencyCode } from '@/lib/currency';
 
 /** Very small subset – expand as you like */
 const COUNTRY_TO_CURRENCY: Record<string, string> = {
@@ -36,7 +36,7 @@ function pickCurrency(countryName: string): string {
   
   return 'USD'; // final fallback
 }
-</parameter>
+
 const schema = {
   name: 'generate_itinerary',
   description: 'Return a fully-structured travel plan with specific, actionable information',
@@ -258,7 +258,8 @@ export async function POST(req: Request) {
 
             2. CURRENCY & PAYMENTS - Direct exchange rates:
                - Show ${form.country} currency to destination currency rate: ${fxNote}
-               - Show destination to ${form.country} currency rate: ${destCur && originCur ? `1 ${destCur} ≈ ${fxRev.toFixed(2)} ${originCur}` : 'Check current exchange rates'}
+               - Show ${form.country} currency to destination currency rate: ${homeIso && destIso ? `1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}` : 'Check current exchange rates'}
+               - Show destination to ${form.country} currency rate: ${destIso && homeIso ? `1 ${destIso} = ${fxDestToHome.toFixed(4)} ${homeIso}` : 'Check current exchange rates'}
                - Explain local payment culture (cash vs card preference)
                - Detail tipping customs with specific amounts/percentages
                - ATM availability and fees

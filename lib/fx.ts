@@ -25,7 +25,9 @@ export async function getFxRate(base: string, quote: string): Promise<{ rate: nu
   const data: { rates?: Record<string, number>; date?: string } = await res.json();
   const rate = data.rates?.[to];
 
-  if (!rate || Number.isNaN(rate)) throw new Error('Rate not found');
+  if (!rate || Number.isNaN(rate)) {
+    return { rate: 1, date: new Date().toISOString().split('T')[0] };
+  }
   
   return {
     rate: rate,

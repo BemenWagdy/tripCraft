@@ -24,49 +24,19 @@ export interface FormValues {
 
 export interface ItineraryData {
   intro: string;
-  beforeYouGo?: string[];
-  visa?: {
-    required?: boolean;
-    type?: string;
-    applicationMethod?: string;
-    processingTime?: string;
-    fee?: string;
-    validityPeriod?: string;
-    appointmentWarning?: string;
-    additionalRequirements?: string[];
-  };
-  currency?: {
-    destinationCode?: string;
-    homeToDestination?: string;
-    destinationToHome?: string;
-    cashCulture?: string;
-    tippingNorms?: string;
-    atmAvailability?: string;
-    cardAcceptance?: string;
-  };
-  averages?: { hostel?: string; midHotel?: string; highEnd?: string };
+  beforeYouGo: string[];
+  visa: string;
+  currency: { code: string; rateUsd: number };
+  averages: { hostel: number; midHotel: number; highEnd: number };
   weather: string;
-  cultureTips?: string[];
-  foodList?: Array<{
+  cultureTips: string[];
+  foodList: Array<{
     name: string;
     note?: string;
     rating: number;
     source: string;
   }>;
-  tips?: string;
-  practicalInfo?: {
-    powerPlugType?: string;
-    simCardOptions?: string[];
-    emergencyNumbers?: {
-      police?: string;
-      medical?: string;
-      fire?: string;
-      tourist?: string;
-    };
-    commonScams?: string[];
-    safetyApps?: string[];
-    healthRequirements?: string[];
-  };
+  tips: string;
   days: Array<{
     date: string;
     title: string;

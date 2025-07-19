@@ -131,7 +131,9 @@ const schema = {
                   time: { type: 'string' },
                   text: { type: 'string' },
                   mode: { type: 'string' },
-                  cost: { type: 'string' }
+                  cost: { type: 'string' },
+                  costLocal: { type: 'string' },
+                  costDestination: { type: 'string' }
                 },
                 required: ['text']
               }
@@ -141,7 +143,9 @@ const schema = {
         }
       },
 
-      totalCost: { type: 'string' }
+      totalCost: { type: 'string' },
+      totalCostLocal: { type: 'string' },
+      totalCostDestination: { type: 'string' }
     },
     required: [
       'intro', 'visa', 'currency', 'beforeYouGo', 'days'
@@ -238,6 +242,13 @@ export async function POST(req: Request) {
             • Must-see: ${form.mustSee || 'None specified'}
             • Avoid: ${form.avoid || 'None specified'}
 
+            CURRENCY INFORMATION:
+            • Traveler's home currency: ${homeIso}
+            • Destination currency: ${destIso}
+            • Exchange rate: 1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}
+            • Reverse rate: 1 ${destIso} = ${fxDestToHome.toFixed(4)} ${homeIso}
+            • ${fxNote}
+
             CRITICAL REQUIREMENTS:
 
             1. VISA INFORMATION - Be specific for ${form.country} citizens going to ${form.destination}:
@@ -249,8 +260,8 @@ export async function POST(req: Request) {
 
             2. CURRENCY & PAYMENTS - Direct exchange rates:
                - Show ${form.country} currency to destination currency rate: ${fxNote}
-               - Show ${form.country} currency to destination currency rate: ${homeIso && destIso ? `1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}` : 'Check current exchange rates'}
-               - Show destination to ${form.country} currency rate: ${destIso && homeIso ? `1 ${destIso} = ${fxDestToHome.toFixed(4)} ${homeIso}` : 'Check current exchange rates'}
+               - Show exchange rate: 1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}
+               - Show reverse rate: 1 ${destIso} = ${fxDestToHome.toFixed(4)} ${homeIso}
                - Explain local payment culture (cash vs card preference)
                - Detail tipping customs with specific amounts/percentages
                - ATM availability and fees
@@ -298,7 +309,9 @@ export async function POST(req: Request) {
                - Include snack breaks and rest periods
                - Plan activities to cover maximum area efficiently with logical routing
                - Group nearby attractions together to minimize travel time
-               - Include specific costs in local currency
+               - CRITICAL: Include specific costs in BOTH currencies for every activity
+               - Format costs as: "cost": "${destIso} amount (${homeIso} amount)"
+               - Example: "cost": "150 EGP (3.75 USD)", "costLocal": "3.75 USD", "costDestination": "150 EGP"
                - Realistic transport options and times
                - Account for opening/closing times of attractions
                - Include evening activities and nightlife options
@@ -308,12 +321,20 @@ export async function POST(req: Request) {
 
             8. FOOD RECOMMENDATIONS:
                - Minimum 10 specific dishes/restaurants with ratings and sources
-               - Include specific pricing for each item (e.g., "$8-12", "€15", "₹200-300")
+               - Include specific pricing in BOTH currencies (e.g., "150 EGP (3.75 USD)", "25 AED (6.80 USD)")
                - Include ${form.dietary} options where relevant
                - Mix of price points within budget
                - Local specialties and where to find them
                - Include street food, traditional dishes, popular restaurants, local markets, desserts, and beverages
                - Provide variety across different meal types (breakfast, lunch, dinner, snacks)
+
+            DUAL CURRENCY DISPLAY REQUIREMENTS:
+            - Every cost must show both currencies: destination currency first, then home currency in parentheses
+            - Use the exchange rates provided: 1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}
+            - Format: "Amount ${destIso} (Amount ${homeIso})"
+            - Be consistent throughout the entire itinerary
+            - Include costs for: meals, transportation, activities, accommodations, tips, shopping
+            - Show daily totals and grand total in both currencies
 
             Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
           `
@@ -492,6 +513,9 @@ export async function POST(req: Request) {
       }),
 
       totalCost: `$${(form?.dailyBudget || 100) * duration}`,
+      totalCostLocal: `$${(form?.dailyBudget || 100) * duration} USD`,
+      totalCostDestination: `${Math.round((form?.dailyBudget || 100) * duration * fxHomeToDest)} ${destIso}`,
+      currencies: { home: homeIso, destination: destIso, rate: fxHomeToDest },
       lastUpdated: fxDate
     };
 

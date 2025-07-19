@@ -87,6 +87,9 @@ export default function Questionnaire() {
     },
   });
 
+  /* ---------------------------------------------------------------
+     onSubmit – single read of the Response body  (no stream errors)
+  ----------------------------------------------------------------*/
   const onSubmit = async (values: QuestionnaireValues) => {
     setIsLoading(true);
     
@@ -98,8 +101,8 @@ export default function Questionnaire() {
       const formData = {
         destination: values.destination,
         country: values.country,
-        foodStyle: values.dietary.toLowerCase(),
-        travelStyle: values.travelVibe.toLowerCase(),
+        dietary: values.dietary.toLowerCase(),
+        travelVibe: values.travelVibe.toLowerCase(),
         interests: values.interests,
         dailyBudget: values.budgetPerDay,
         duration: duration,
@@ -115,33 +118,29 @@ export default function Questionnaire() {
         },
       };
 
-      const response = await fetch('/api/ai', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
 
-      // Clone response to avoid "body stream already read" error
-      const responseClone = response.clone();
+      /* ---- always read body ONCE ---- */
+      const body = await res.json();       // single consumption
+      const ok = res.ok;
 
-      // Handle non-JSON or error responses gracefully
-      if (!response.ok) {
-        let errorMessage = 'Failed to generate itinerary';
-        try {
-          const errorData = await responseClone.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          // If response is not JSON, get text
-          const errorText = await responseClone.text();
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
+      if (!ok) {
+        appendError(body.error ?? 'Unknown API error', 'api');
+        throw new Error(body.error ?? 'Server error – try again.');
       }
 
-      const data = await response.json();
-      setItinerary(JSON.stringify(data));
+      /* ---- success path ---- */
+      if (body.warnings?.length) {
+        // optional: toast / banner to tell the user something was auto-fixed
+        console.warn('[TripCraft] API warnings:', body.warnings.join(' | '));
+      }
+
+      setItinerary(JSON.stringify(body));                    // push to result component
+
     } catch (err) {
       appendError(err, 'questionnaire-submit');
       setItinerary(`# Error Generating Itinerary

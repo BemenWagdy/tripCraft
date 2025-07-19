@@ -152,7 +152,94 @@ RULES
   /*－－ call LLM －－*/
   const llm = await groq.chat.completions.create({
     model: GROQ_MODEL, temperature: 0.7,
-    tools: [{ type:'function', function: { name:'generate_itinerary', parameters:{ type:'object' }}}],
+    tools: [{ 
+      type: 'function', 
+      function: { 
+        name: 'generate_itinerary', 
+        parameters: {
+          type: 'object',
+          properties: {
+            intro: { type: 'string' },
+            beforeYouGo: { 
+              type: 'array', 
+              items: { type: 'string' },
+              minItems: 6
+            },
+            visa: {
+              type: 'object',
+              properties: {
+                required: { type: 'boolean' },
+                type: { type: 'string' }
+              },
+              required: ['required', 'type']
+            },
+            currency: {
+              type: 'object',
+              properties: {
+                destinationCode: { type: 'string' },
+                homeToDestination: { type: 'string' },
+                destinationToHome: { type: 'string' }
+              },
+              required: ['destinationCode', 'homeToDestination', 'destinationToHome']
+            },
+            averages: {
+              type: 'object',
+              properties: {
+                hostel: { type: 'string' },
+                midHotel: { type: 'string' },
+                highEnd: { type: 'string' }
+              }
+            },
+            cultureTips: {
+              type: 'array',
+              items: { type: 'string' },
+              minItems: 5
+            },
+            foodList: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  note: { type: 'string' },
+                  price: { type: 'string' },
+                  rating: { type: 'number' },
+                  source: { type: 'string' }
+                },
+                required: ['name', 'note', 'price', 'rating', 'source']
+              },
+              minItems: 10
+            },
+            days: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  date: { type: 'string' },
+                  title: { type: 'string' },
+                  steps: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        time: { type: 'string' },
+                        text: { type: 'string' }
+                      },
+                      required: ['time', 'text']
+                    }
+                  }
+                },
+                required: ['date', 'title', 'steps']
+              }
+            },
+            totalCost: { type: 'string' },
+            totalCostLocal: { type: 'string' },
+            totalCostDestination: { type: 'string' }
+          },
+          required: ['intro', 'beforeYouGo', 'visa', 'currency', 'cultureTips', 'foodList', 'days']
+        }
+      }
+    }],
     messages:[
       { role:'system', content:system },
       { role:'user',   content:user }

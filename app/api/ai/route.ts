@@ -2,7 +2,6 @@ import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 import { getFxRate } from '@/lib/fx';
-import { currencyCode } from '@/lib/currency';
 
 /** Very small subset – expand as you like */
 const COUNTRY_TO_CURRENCY: Record<string, string> = {
@@ -192,40 +191,59 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid request format' }, { status: 400 });
   }
 
-  // Initialize variables with defaults to prevent undefined errors
-  let homeIso = 'USD';
-  let destIso = 'USD'; 
-  let fxHomeToDest = 1;
-  let fxDestToHome = 1;
-  let fxDate = new Date().toISOString().split('T')[0];
-  let fxNote = 'Exchange rates unavailable';
-
   try {
     // Convert string dates to Date objects before calculating duration
     const startDate = new Date(form.dateRange.from);
     const endDate = new Date(form.dateRange.to);
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // ------------------ CURRENCY PAIR ------------------
-    homeIso = currencyCode(form.country) || 'USD';
-    destIso = currencyCode(
-      // if "destination" is a city, pass a dedicated country field instead
-      (form as any).destinationCountry ?? form.destination
-    ) || 'USD';
-
-    if (homeIso && destIso) {
-      try {
-        const fxResult = await getFxRate(homeIso, destIso);
-        fxHomeToDest = fxResult.rate;
-        fxDate = fxResult.date;
-        fxNote = `Exchange rates via exchangerate.host · updated ${fxDate}`;
-      } catch (err) {
-        console.error('[FX] lookup failed – falling back to 1:1', err);
-        fxHomeToDest = 1;
-      }
+    /* ------------------ CURRENCY PAIR (LOGIC) ------------------ */
+    /**
+     * Very small helper that converts a country-name OR ISO code into
+     * a 3-letter ISO-4217 currency.  Extend the map as you wish.
+     */
+    function currencyCode(input?: string): string | undefined {
+      if (!input) return;
+      const raw = input.trim().toUpperCase();
+    
+      // already an ISO-4217 code?
+      if (raw.length === 3) return raw;
+    
+      // minimal fallback map
+      const map: Record<string, string> = {
+        EGYPT: 'EGP',
+        'UNITED ARAB EMIRATES': 'AED',
+        UAE: 'AED',
+        BELGIUM: 'EUR',
+        USA: 'USD',
+        'UNITED STATES': 'USD'
+      };
+      return map[raw];
     }
-
-    fxDestToHome = 1 / fxHomeToDest;
+    
+    let homeIso  = currencyCode(form.country) ||
+                   'USD'; // final fallback
+    let destIso  = currencyCode(
+                    (form as any).destinationCountry ?? form.destination
+                  ) || 'USD';
+    
+    let fxHomeToDest = 1;
+    let fxDestToHome = 1;
+    let fxDate       = '';
+    let fxNote       = '';
+    
+    try {
+      if (homeIso && destIso) {
+        const { rate, date } = await getFxRate(homeIso, destIso);
+        fxHomeToDest = rate;
+        fxDestToHome = 1 / rate;
+        fxDate       = date;
+        fxNote       = `Exchange rates · updated ${fxDate}`;
+      }
+    } catch (err) {
+      console.error('[FX] lookup failed – falling back to 1 : 1', err);
+    }
+    /* ----------------------------------------------------------- */
 
     const completion = await groq.chat.completions.create({
       model: GROQ_MODEL,

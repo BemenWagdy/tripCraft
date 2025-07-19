@@ -1,36 +1,30 @@
-// lib/fx.ts
-// ------------------------------------------------------------------
-// Fetch live exchange rates for *any* currency pair via exchangerate.host
-// ------------------------------------------------------------------
-
-const BASE_URL = 'https://api.exchangerate.host/latest';
+export interface FxResult {
+  rate: number;
+  date: string;
+}
 
 /**
- * Returns the price of 1 unit of `base` expressed in `quote`.
- * Example:  getFxRate('AED', 'EGP')  ->  { rate: 14.02, date: "2025-07-19" }
+ * Fetches a live foreign-exchange rate using exchangerate.host.
+ * Falls back to 1 : 1 if the rate is unavailable.
+ *
+ * @param from ISO-4217 currency you are converting **from** (e.g. "USD")
+ * @param to   ISO-4217 currency you are converting **to**   (e.g. "EUR")
  */
-export async function getFxRate(base: string, quote: string): Promise<{ rate: number; date: string }> {
-  // normalise to upper-case 3-letter codes
-  const from = base.trim().toUpperCase();
-  const to   = quote.trim().toUpperCase();
-
-  // same-currency shortcut
-  if (from === to) return { rate: 1, date: new Date().toISOString().split('T')[0] };
-
-  const url = `${BASE_URL}?base=${encodeURIComponent(from)}&symbols=${encodeURIComponent(to)}`;
-
-  const res = await fetch(url, { next: { revalidate: 3600 } }); // 1-hour cache
-  if (!res.ok) throw new Error(`FX request failed ${res.status}`);
-
-  const data: { rates?: Record<string, number>; date?: string } = await res.json();
-  const rate = data.rates?.[to];
-
-  if (!rate || Number.isNaN(rate)) {
-    return { rate: 1, date: new Date().toISOString().split('T')[0] };
+export async function getFxRate(from: string, to: string): Promise<FxResult> {
+  if (from.toUpperCase() === to.toUpperCase()) {
+    return { rate: 1, date: new Date().toISOString().slice(0, 10) };
   }
-  
-  return {
-    rate: rate,
-    date: data.date || new Date().toISOString().split('T')[0]
-  };
+
+  const url = `https://api.exchangerate.host/latest?base=${encodeURIComponent(
+    from
+  )}&symbols=${encodeURIComponent(to)}`;
+
+  const res = await fetch(url, { next: { revalidate: 60 * 60 } }); // 1 h cache
+  if (!res.ok) throw new Error(`FX request failed – ${res.status}`);
+
+  const json = await res.json();
+  const rate = json?.rates?.[to.toUpperCase()];
+  if (!rate) throw new Error('Rate not found');
+
+  return { rate, date: json.date ?? new Date().toISOString().slice(0, 10) };
 }

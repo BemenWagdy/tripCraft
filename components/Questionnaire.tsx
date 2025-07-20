@@ -123,21 +123,22 @@ export default function Questionnaire() {
         body: JSON.stringify(formData)
       });
 
-      // Handle non-JSON or error responses gracefully
+      // Read response body only once
+      const responseText = await response.text();
+      
       if (!response.ok) {
         let errorMessage = 'Failed to generate itinerary';
         try {
-          const errorData = await response.json();
+          const errorData = JSON.parse(responseText);
           errorMessage = errorData.error || errorMessage;
         } catch {
-          // If response is not JSON, get text
-          const errorText = await response.text();
-          errorMessage = errorText || errorMessage;
+          errorMessage = responseText || errorMessage;
         }
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      // Parse the response text as JSON
+      const data = JSON.parse(responseText);
       setItinerary(JSON.stringify(data));
     } catch (err) {
       appendError(err, 'questionnaire-submit');

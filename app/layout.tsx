@@ -1,8 +1,5 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'TripCraft - AI-Powered Travel Itineraries',
@@ -16,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body>
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
           <main className="container mx-auto px-4 py-8">
             {children}

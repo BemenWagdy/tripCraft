@@ -136,6 +136,7 @@ const schema = {
                   cost: { type: 'string' },
                   costLocal: { type: 'string' },
                   costDestination: { type: 'string' }
+                }
                 lastPaidStep.cost = `${Math.round(newDestAmount)} ${destIso} ($${newHomeAmount} USD)`;
                 required: ['text']
               }

@@ -425,89 +425,34 @@ export async function POST(req: Request) {
       // Post-process days to ensure all have cost fields
       if (parsedResponse.days && Array.isArray(parsedResponse.days)) {
         parsedResponse.days = parsedResponse.days.map((day: any, index: number) => {
-          const dailyBudgetUSD = form?.budgetPerDay || 100;
-          const dailyCostDest = Math.round(dailyBudgetUSD * fxHomeToDest);
-          
           if (!day.cost) {
-            day.cost = `${dailyCostDest} ${destIso} ($${dailyBudgetUSD} USD)`;
+            const dailyCost = Math.round((form?.budgetPerDay || 100) * fxHomeToDest);
+            day.cost = `${dailyCost} ${destIso} ($${form?.budgetPerDay || 100} ${homeIso})`;
             console.log(`[AI] Added missing cost to day ${index + 1}: ${day.cost}`);
           } else {
-            // Ensure consistent formatting
-            day.cost = `${dailyCostDest} ${destIso} ($${dailyBudgetUSD} USD)`;
+            const dailyBudgetUSD = form?.budgetPerDay || 100;
+            const dailyCostDest = Math.round(dailyBudgetUSD * fxHomeToDest);
+            day.cost = `${dailyCostDest} ${destIso} ($${dailyBudgetUSD} ${homeIso})`;
           }
           
-          // Fix step costs to ensure they add up correctly
           if (day.steps && Array.isArray(day.steps)) {
-            // Calculate costs for steps that don't have them
-            const stepsWithCost = day.steps.filter((step: any) => 
-              step.cost && step.cost !== 'Free' && step.cost !== 'Included'
-            );
-            const stepsWithoutCost = day.steps.filter((step: any) => 
-              !step.cost || step.cost === 'Free' || step.cost === 'Included'
-            );
+            let dailyTotal = 0;
+            const stepsWithoutCost = day.steps.filter((step: any) => !step.cost).length;
             
             if (stepsWithoutCost > 0) {
-              // Calculate remaining budget after existing costs
-              let usedBudget = 0;
-              stepsWithCost.forEach((step: any) => {
-                const costMatch = step.cost.match(/(\d+)\s*EUR/);
-                if (costMatch) {
-                  usedBudget += parseInt(costMatch[1]);
+              const dailyBudgetUSD = form?.budgetPerDay || 100;
+              const costPerStepUSD = dailyBudgetUSD / day.steps.length;
+              const remainingBudget = dailyBudgetUSD;
+              const costPerStep = remainingBudget / day.steps.length;
+              
+              day.steps = day.steps.map((step: any) => {
+                if (!step.cost) {
+                  const stepCostUSD = Math.round(costPerStep);
+                  const stepCostDest = Math.round(stepCostUSD * fxHomeToDest);
+                  step.cost = `${stepCostDest} ${destIso} ($${stepCostUSD} ${homeIso})`;
                 }
+                return step;
               });
-              
-              const remainingBudgetDest = dailyCostDest - Math.round(usedBudget * fxHomeToDest);
-              const remainingBudgetUSD = dailyBudgetUSD - usedBudget;
-              
-              if (remainingBudgetUSD > 0 && stepsWithoutCost.length > 0) {
-                const costPerStepUSD = Math.floor(remainingBudgetUSD / stepsWithoutCost.length);
-                const costPerStepDest = Math.round(costPerStepUSD * fxHomeToDest);
-                
-                stepsWithoutCost.forEach((step: any, idx: number) => {
-                  if (step.cost !== 'Free' && step.cost !== 'Included') {
-                    // Distribute remaining budget among steps
-                    let stepCostUSD = costPerStepUSD;
-                    let stepCostDest = costPerStepDest;
-                    
-                    // Add remainder to last step
-                    if (idx === stepsWithoutCost.length - 1) {
-                      const totalAssigned = costPerStepUSD * stepsWithoutCost.length;
-                      stepCostUSD += remainingBudgetUSD - totalAssigned;
-                      stepCostDest = Math.round(stepCostUSD * fxHomeToDest);
-                    }
-                    
-                    step.cost = `${stepCostDest} ${destIso} ($${stepCostUSD} USD)`;
-                  }
-                });
-              }
-            }
-            
-            // Verify total matches expected budget
-            let calculatedTotal = 0;
-            day.steps.forEach((step: any) => {
-              if (step.cost && step.cost !== 'Free' && step.cost !== 'Included') {
-                const costMatch = step.cost.match(/\$(\d+)\s*USD/);
-                if (costMatch) {
-                  calculatedTotal += parseInt(costMatch[1]);
-                }
-              }
-            });
-              
-            // If total doesn't match, adjust the first paid activity
-            if (calculatedTotal !== dailyBudgetUSD) {
-              const adjustment = dailyBudgetUSD - calculatedTotal;
-              const firstPaidStep = day.steps.find((step: any) => 
-                step.cost && step.cost !== 'Free' && step.cost !== 'Included'
-              );
-              
-              if (firstPaidStep && adjustment !== 0) {
-                const currentMatch = firstPaidStep.cost.match(/\$(\d+)\s*USD/);
-                if (currentMatch) {
-                  const newCostUSD = parseInt(currentMatch[1]) + adjustment;
-                  const newCostDest = Math.round(newCostUSD * fxHomeToDest);
-                  firstPaidStep.cost = `${newCostDest} ${destIso} ($${newCostUSD} USD)`;
-              - Format activity costs as: "Amount ${destIso} ($Amount USD)"
-              }
             }
           }
           
@@ -522,9 +467,9 @@ export async function POST(req: Request) {
         const grandTotalUSD = dailyBudgetUSD * totalDays;
         const grandTotalDest = Math.round(grandTotalUSD * fxHomeToDest);
         
-        parsedResponse.totalCost = `$${grandTotalUSD} USD`;
-        parsedResponse.totalCostLocal = `$${grandTotalUSD} USD`;  
-        parsedResponse.totalCostDestination = `${grandTotalDest} ${destIso} ($${grandTotalUSD} USD)`;
+        parsedResponse.totalCost = `$${grandTotalUSD} ${homeIso}`;
+        parsedResponse.totalCostLocal = `$${grandTotalUSD} ${homeIso}`;
+        parsedResponse.totalCostDestination = `${grandTotalDest} ${destIso} ($${grandTotalUSD} ${homeIso})`;
       }
       
       return new Response(JSON.stringify(parsedResponse), {

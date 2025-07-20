@@ -136,7 +136,7 @@ const schema = {
                   cost: { type: 'string' },
                   costLocal: { type: 'string' },
                   costDestination: { type: 'string' }
-                },
+                lastPaidStep.cost = `${Math.round(newDestAmount)} ${destIso} ($${newHomeAmount} USD)`;
                 required: ['text']
               }
             }
@@ -327,6 +327,7 @@ export async function POST(req: Request) {
 
             7. DAILY ITINERARY:
                - Each day needs detailed steps from early morning (6:00 AM) to late night (11:00 PM)
+               - MINIMUM 6 ACTIVITIES per day - no exceptions
                - Include specific times for each activity with realistic durations
               - DO NOT include airport transfers or accommodation costs in daily activities
               - Start from the city center, assume accommodation is already booked separately
@@ -336,12 +337,21 @@ export async function POST(req: Request) {
                - Plan activities to cover maximum area efficiently with logical routing
                - Group nearby attractions together to minimize travel time
                
+               ACTIVITY REQUIREMENTS PER DAY:
+               - Morning activity (9:00-11:00)
+               - Pre-lunch activity (11:00-12:30)
+               - Afternoon activity (14:00-16:00)
+               - Late afternoon activity (16:00-17:30)
+               - Evening activity (19:00-21:00)
+               - Night activity (21:00-23:00)
+               - Plus meals, transport, and rest periods
+               
                MANDATORY COST REQUIREMENTS:
                - EVERY SINGLE ACTIVITY must have a cost in BOTH currencies
                - Daily total MUST EQUAL EXACTLY $${form.budgetPerDay} USD
                - Daily total MUST EQUAL EXACTLY ${Math.round(form.budgetPerDay * fxHomeToDest)} ${destIso}
-               - Format daily costs as: "${Math.round(form.budgetPerDay * fxHomeToDest)} ${destIso} ($${form.budgetPerDay} ${homeIso})"
-               - Format activity costs as: "Amount ${destIso} ($Amount ${homeIso})"
+               - Format daily costs as: "${Math.round(form.budgetPerDay * fxHomeToDest)} ${destIso} ($${form.budgetPerDay} USD)"
+               - Format activity costs as: "Amount ${destIso} ($Amount USD)" - no $ with local currency
                - All step costs within a day must add up to the daily total
                - Distribute costs logically: meals 40%, activities 35%, transport 15%, misc 10%
                
@@ -363,9 +373,13 @@ export async function POST(req: Request) {
                - Local specialties and where to find them
                - Include street food, traditional dishes, popular restaurants, local markets, desserts, and beverages
                - Provide variety across different meal types (breakfast, lunch, dinner, snacks)
+               - Price format: "Amount ${destIso} ($Amount USD)" - no $ symbol with local currency
 
             CRITICAL BUDGET & CURRENCY REQUIREMENTS:
             - EVERY activity cost must show both currencies: "Amount ${destIso} ($Amount ${homeIso})"
+            - For local/destination currency: DO NOT use $ symbol, use only the local currency symbol or code
+            - For USD amounts: Always use $ symbol
+            - Example formats: "150 EGP ($5 USD)" or "25 EUR ($27 USD)" - never "150 $EGP"
             - Use the exchange rates: 1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}
             - Daily activity costs MUST total EXACTLY $${form.budgetPerDay} USD (${Math.round(form.budgetPerDay * fxHomeToDest)} ${destIso})
             - EXCLUDE airport transfers and accommodation from the daily budget calculations
@@ -438,7 +452,7 @@ export async function POST(req: Request) {
           }
           
           // Write real sum back to day.cost in dual-currency format
-          day.cost = `${Math.round(dayTotalDest)} ${destIso} ($${Math.round(dayTotalHome)} ${homeIso})`;
+          day.cost = `${Math.round(dayTotalDest)} ${destIso} ($${Math.round(dayTotalHome)} USD)`;
           
           grandTotalDest += dayTotalDest;
           grandTotalHome += dayTotalHome;
@@ -467,7 +481,7 @@ export async function POST(req: Request) {
               const newDestAmount = Math.max(0, currentParsed.dest + difference);
               const newHomeAmount = Math.round(newDestAmount / fxHomeToDest);
               
-              firstPaidStep.cost = `${Math.round(newDestAmount)} ${destIso} ($${newHomeAmount} ${homeIso})`;
+              firstPaidStep.cost = `${Math.round(newDestAmount)} ${destIso} ($${newHomeAmount} USD)`;
               grandTotalDest = expectedDestFromHome;
             }
           }

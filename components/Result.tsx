@@ -439,8 +439,12 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
                 </li>
               ))}
             </ul>
-            {day.cost && (
-              <div className="bg-gray-100 p-3 rounded-lg flex justify-between items-center">
+            <div className="bg-gray-100 p-3 rounded-lg flex justify-between items-center mt-4">
+              <span className="font-semibold">Estimated day total</span>
+              <span className="font-bold text-lg text-green-600">
+                {day.cost || 'Cost not calculated'}
+              </span>
+            </div>
                 <span className="font-semibold">Estimated day total</span>
                 <span className="font-bold text-lg">{day.cost}</span>
               </div>

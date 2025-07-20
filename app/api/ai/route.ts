@@ -364,15 +364,30 @@ export async function POST(req: Request) {
       
       // Post-process foodList to ensure minimum 10 items
       if (parsedResponse.foodList && parsedResponse.foodList.length < 10) {
+        console.log(`[AI] Only ${parsedResponse.foodList.length} food items generated, adding fallbacks`);
         while (parsedResponse.foodList.length < 10) {
+          const itemNumber = parsedResponse.foodList.length + 1;
+          const baseCost = Math.round((form?.budgetPerDay || 100) * 0.15 * fxHomeToDest); // 15% of daily budget
           parsedResponse.foodList.push({
-            name: `Local dish #${parsedResponse.foodList.length + 1}`,
-            note: 'Ask locals for the best spot',
+            name: `Local Specialty #${itemNumber}`,
+            note: 'Ask locals for recommendations',
             rating: 4.0,
-            price: '—',
-            source: 'N/A'
+            price: `${baseCost} ${destIso} (${Math.round(baseCost * fxDestToHome)} ${homeIso})`,
+            source: 'Local recommendation'
           });
         }
+      }
+      
+      // Post-process days to ensure all have cost fields
+      if (parsedResponse.days && Array.isArray(parsedResponse.days)) {
+        parsedResponse.days = parsedResponse.days.map((day: any, index: number) => {
+          if (!day.cost) {
+            const dailyCost = Math.round((form?.budgetPerDay || 100) * fxHomeToDest);
+            day.cost = `${dailyCost} ${destIso} (${form?.budgetPerDay || 100} ${homeIso})`;
+            console.log(`[AI] Added missing cost to day ${index + 1}: ${day.cost}`);
+          }
+          return day;
+        });
       }
       
       return new Response(JSON.stringify(parsedResponse), {

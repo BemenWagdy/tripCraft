@@ -48,9 +48,17 @@ export function DateRangeField<T extends FieldValues>({
             numberOfMonths={2}
             selected={value as DateRange | undefined}
             defaultMonth={value?.from}
-            onSelect={(rng) =>
-              form.setValue(name, rng as DateRange | undefined, { shouldValidate: true })
-            }
+            onSelect={(rng) => {
+              // react-day-picker returns undefined when the user clears the range.
+              // Our RHF field expects a DateRange, so fall back to an empty object.
+              if (rng) {
+                form.setValue(name, rng as DateRange, { shouldValidate: true })
+              } else {
+                form.setValue(name, { from: undefined, to: undefined } as DateRange, {
+                  shouldValidate: true,
+                })
+              }
+            }}
             disabled={(date) => date < new Date()}
           />
         </PopoverContent>

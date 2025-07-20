@@ -46,7 +46,7 @@ export function DateRangeField<T extends FieldValues>({
           <Calendar
             mode="range"
             numberOfMonths={2}
-            selected={value as Matcher | undefined}
+            selected={value as DateRange | undefined}
             defaultMonth={value?.from}
             onSelect={(rng) =>
               form.setValue(name, rng as DateRange | undefined, { shouldValidate: true })

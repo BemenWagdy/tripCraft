@@ -465,6 +465,9 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
 
   // Render structured data as HTML
   const renderStructuredContent = (data: any) => {
+    return <StructuredContent data={data} destination={destination} />;
+  };
+
   // Fallback markdown renderer for non-structured responses
   const renderMarkdown = (content: string) => {
     return content.split('\n').map((line, index) => {
@@ -530,7 +533,7 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
         </CardHeader>
         <CardContent className="p-8">
           <div className="prose prose-lg max-w-none">
-            {structuredData ? <StructuredContent data={structuredData} destination={destination} /> : renderMarkdown(itinerary)}
+            {structuredData ? renderStructuredContent(structuredData) : renderMarkdown(itinerary)}
           </div>
         </CardContent>
       </Card>

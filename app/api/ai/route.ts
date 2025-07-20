@@ -259,6 +259,7 @@ export async function POST(req: Request) {
 
             CRITICAL REQUIREMENTS:
 
+            MANDATORY: You MUST provide exactly 10 food recommendations. No exceptions. Generate 10 distinct, specific food items/restaurants.
             1. VISA INFORMATION - Be specific for ${form.country} citizens going to ${form.destination}:
                - State clearly if visa required, visa-free, visa on arrival, or eVisa
                - Provide exact application method (e.g., "Apply via VFS Global Mumbai", "TLScontact Berlin")
@@ -317,10 +318,11 @@ export async function POST(req: Request) {
                - Include snack breaks and rest periods
                - Plan activities to cover maximum area efficiently with logical routing
                - Group nearby attractions together to minimize travel time
-               - CRITICAL: Include specific costs in BOTH currencies for every activity, scaled to the ${form.budgetPerDay} USD daily budget
+               - CRITICAL: Include specific costs in BOTH currencies for every activity
+               - MANDATORY: Daily total must equal approximately $${form.budgetPerDay} USD (${(form.budgetPerDay * fxHomeToDest).toFixed(0)} ${destIso})
+               - Each activity cost should be realistic and proportional to the daily budget
                - Format costs as: "cost": "Amount ${destIso} (Amount ${homeIso})"
                - Example: "cost": "150 EGP (3.75 USD)"
-               - Daily total should approximate $${form.budgetPerDay} USD (${(form.budgetPerDay * fxHomeToDest).toFixed(0)} ${destIso})
                - Realistic transport options and times
                - Account for opening/closing times of attractions
                - Include evening activities and nightlife options
@@ -328,8 +330,9 @@ export async function POST(req: Request) {
                - Match ${form.accommodation} preference and $${form.dailyBudget} budget
                - Account for ${form.groupType} group dynamics
 
-            8. FOOD RECOMMENDATIONS:
-               - Minimum 10 specific dishes/restaurants with ratings, sources AND prices
+            8. FOOD RECOMMENDATIONS (MANDATORY 10 ITEMS):
+               - EXACTLY 10 specific dishes/restaurants with ratings, sources AND prices
+               - Must include: 2 street food items, 2 local restaurants, 2 traditional dishes, 2 popular chains/cafes, 1 fine dining, 1 local dessert/beverage
                - Include specific pricing in BOTH currencies scaled to budget: "price": "Amount ${destIso} (Amount ${homeIso})"
                - Example: "price": "25 EGP (0.60 USD)" for street food, "price": "120 EGP (3.00 USD)" for restaurant meal
                - Include ${form.dietary} options where relevant
@@ -365,14 +368,45 @@ export async function POST(req: Request) {
       // Post-process foodList to ensure minimum 10 items
       if (parsedResponse.foodList && parsedResponse.foodList.length < 10) {
         console.log(`[AI] Only ${parsedResponse.foodList.length} food items generated, adding fallbacks`);
+        
+        // Better fallback food items with proper pricing
+        const fallbackFoods = [
+          { name: "Local Street Food Vendor", note: "Popular street-side snack", type: "street" },
+          { name: "Traditional Family Restaurant", note: "Authentic local cuisine", type: "restaurant" },
+          { name: "Local Coffee Shop", note: "Traditional coffee and pastries", type: "cafe" },
+          { name: "Popular Local Chain", note: "Well-known local restaurant chain", type: "chain" },
+          { name: "Traditional Dessert Shop", note: "Local sweets and desserts", type: "dessert" },
+          { name: "Local Market Food Stall", note: "Fresh market foods", type: "market" },
+          { name: "Casual Dining Restaurant", note: "Mid-range local restaurant", type: "restaurant" },
+          { name: "Local Breakfast Spot", note: "Where locals start their day", type: "breakfast" },
+          { name: "Traditional Beverage Shop", note: "Local drinks and refreshments", type: "beverage" },
+          { name: "Fine Dining Restaurant", note: "Upscale local cuisine", type: "fine" }
+        ];
+        
         while (parsedResponse.foodList.length < 10) {
           const itemNumber = parsedResponse.foodList.length + 1;
-          const baseCost = Math.round((form?.budgetPerDay || 100) * 0.15 * fxHomeToDest); // 15% of daily budget
+          const fallbackIndex = (itemNumber - 1) % fallbackFoods.length;
+          const fallbackFood = fallbackFoods[fallbackIndex];
+          
+          // Calculate realistic costs based on food type and budget
+          let costPercentage;
+          switch (fallbackFood.type) {
+            case 'street': costPercentage = 0.08; break;  // 8% of daily budget
+            case 'cafe': case 'breakfast': case 'beverage': costPercentage = 0.12; break;  // 12%
+            case 'market': case 'dessert': costPercentage = 0.10; break;  // 10%
+            case 'restaurant': case 'chain': costPercentage = 0.20; break;  // 20%
+            case 'fine': costPercentage = 0.35; break;  // 35%
+            default: costPercentage = 0.15; break;
+          }
+          
+          const baseCostUSD = Math.round((form?.budgetPerDay || 100) * costPercentage);
+          const baseCostDest = Math.round(baseCostUSD * fxHomeToDest);
+          
           parsedResponse.foodList.push({
-            name: `Local Specialty #${itemNumber}`,
-            note: 'Ask locals for recommendations',
+            name: fallbackFood.name,
+            note: fallbackFood.note,
             rating: 4.0,
-            price: `${baseCost} ${destIso} (${Math.round(baseCost * fxDestToHome)} ${homeIso})`,
+            price: `${baseCostDest} ${destIso} (${baseCostUSD} ${homeIso})`,
             source: 'Local recommendation'
           });
         }
@@ -386,6 +420,27 @@ export async function POST(req: Request) {
             day.cost = `${dailyCost} ${destIso} (${form?.budgetPerDay || 100} ${homeIso})`;
             console.log(`[AI] Added missing cost to day ${index + 1}: ${day.cost}`);
           }
+          
+          // Verify and fix step costs if missing
+          if (day.steps && Array.isArray(day.steps)) {
+            let dailyTotal = 0;
+            const stepsWithoutCost = day.steps.filter((step: any) => !step.cost).length;
+            
+            if (stepsWithoutCost > 0) {
+              const remainingBudget = (form?.budgetPerDay || 100) * 0.8; // 80% for activities
+              const costPerStep = remainingBudget / day.steps.length;
+              
+              day.steps = day.steps.map((step: any) => {
+                if (!step.cost) {
+                  const stepCostUSD = Math.round(costPerStep);
+                  const stepCostDest = Math.round(stepCostUSD * fxHomeToDest);
+                  step.cost = `${stepCostDest} ${destIso} (${stepCostUSD} ${homeIso})`;
+                }
+                return step;
+              });
+            }
+          }
+          
           return day;
         });
       }

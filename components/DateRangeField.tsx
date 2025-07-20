@@ -3,12 +3,11 @@
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { UseFormReturn, FieldValues, FieldPath } from 'react-hook-form';
+import { DateRange, Matcher } from 'react-day-picker';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-type Range = { from?: Date; to?: Date };
 
 type Props<T extends FieldValues> = {
   form: UseFormReturn<T>;
@@ -21,7 +20,7 @@ export function DateRangeField<T extends FieldValues>({
   name,
   label = 'Date range',
 }: Props<T>) {
-  const value = form.watch(name) as Range | undefined;
+  const value = form.watch(name) as DateRange | undefined;
   const pretty =
     value?.from && value?.to
       ? `${format(value.from, 'yyyy-MM-dd')} → ${format(value.to, 'yyyy-MM-dd')}`
@@ -47,10 +46,10 @@ export function DateRangeField<T extends FieldValues>({
           <Calendar
             mode="range"
             numberOfMonths={2}
-            selected={value}
+            selected={value as Matcher | undefined}
             defaultMonth={value?.from}
             onSelect={(rng) =>
-              form.setValue(name, rng as any, { shouldValidate: true })
+              form.setValue(name, rng as DateRange | undefined, { shouldValidate: true })
             }
             disabled={(date) => date < new Date()}
           />

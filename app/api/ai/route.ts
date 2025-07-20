@@ -182,18 +182,10 @@ export async function POST(req: Request) {
   }
 
   try {
-    // ----- date-range sanity check -----------------------------------
-    if (!form.dateRange?.from || !form.dateRange?.to) {
-      return NextResponse.json(
-        { error: 'Date range is required.' },
-        { status: 400 }
-      );
-    }
-    // -----------------------------------------------------------------
     // Convert string dates to Date objects before calculating duration
     const startDate = new Date(form.dateRange.from);
-    const endDate   = new Date(form.dateRange.to);
-    const duration  = Math.ceil((endDate.getTime() - startDate.getTime()) / 86_400_000); // ms→days
+    const endDate = new Date(form.dateRange.to);
+    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     // Currency conversion logic
     homeIso = currencyCode(form.country) || 'USD';

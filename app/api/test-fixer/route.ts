@@ -62,7 +62,7 @@ export async function GET() {
   } catch (error) {
     console.error('[TEST] Error making request:', error);
     return NextResponse.json({ 
-      error: error instanceof Error ? error.message : String(error),
+      error: error.message,
       message: "Failed to make API request to Fixer.io"
     }, { status: 500 });
   }

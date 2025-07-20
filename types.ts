@@ -1,5 +1,3 @@
-import { DateRange } from 'react-day-picker';
-
 export interface Step {
   time?: string;
   text: string;
@@ -10,7 +8,7 @@ export interface Step {
 
 export interface FormValues {
   destination: string;
-  dateRange: DateRange | undefined;
+  dateRange: { from: string; to: string };
   groupType: string;
   budgetPerDay: number;
   travelVibe: string;

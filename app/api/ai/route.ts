@@ -412,7 +412,7 @@ export async function POST(req: Request) {
             name: fallbackFood.name,
             note: fallbackFood.note,
             rating: 4.0,
-            price: `${baseCostDest} ${destIso} (${baseCostUSD} ${homeIso})`,
+            price: `${baseCostDest} ${destIso} ($${baseCostUSD} ${homeIso})`,
             source: 'Local recommendation'
           });
         }
@@ -423,25 +423,30 @@ export async function POST(req: Request) {
         parsedResponse.days = parsedResponse.days.map((day: any, index: number) => {
           if (!day.cost) {
             const dailyCost = Math.round((form?.budgetPerDay || 100) * fxHomeToDest);
-            day.cost = `${dailyCost} ${destIso} (${form?.budgetPerDay || 100} ${homeIso})`;
+            day.cost = `${dailyCost} ${destIso} ($${form?.budgetPerDay || 100} ${homeIso})`;
             console.log(`[AI] Added missing cost to day ${index + 1}: ${day.cost}`);
+          } else {
+            const dailyBudgetUSD = form?.budgetPerDay || 100;
+            const dailyCostDest = Math.round(dailyBudgetUSD * fxHomeToDest);
+            day.cost = `${dailyCostDest} ${destIso} ($${dailyBudgetUSD} ${homeIso})`;
           }
-              const dailyBudgetUSD = form?.budgetPerDay || 100;
-              const dailyCostDest = Math.round(dailyBudgetUSD * fxHomeToDest);
-              day.cost = `${dailyCostDest} ${destIso} ($${dailyBudgetUSD} ${homeIso})`;
+          
           if (day.steps && Array.isArray(day.steps)) {
             let dailyTotal = 0;
             const stepsWithoutCost = day.steps.filter((step: any) => !step.cost).length;
-               const dailyBudgetUSD = form?.budgetPerDay || 100;
-               const costPerStepUSD = dailyBudgetUSD / day.steps.length;
+            
+            if (stepsWithoutCost > 0) {
+              const dailyBudgetUSD = form?.budgetPerDay || 100;
+              const costPerStepUSD = dailyBudgetUSD / day.steps.length;
+              const remainingBudget = dailyBudgetUSD;
               const costPerStep = remainingBudget / day.steps.length;
               
               day.steps = day.steps.map((step: any) => {
-                   const stepCostUSD = Math.round(costPerStepUSD);
-                  const stepCostUSD = Math.round(costPerStep);
-                   step.cost = `${stepCostDest} ${destIso} ($${stepCostUSD} ${homeIso})`;
-                  step.cost = `${stepCostDest} ${destIso} (${stepCostUSD} ${homeIso})`;
-                price: `${baseCostDest} ${destIso} ($${baseCostUSD} ${homeIso})`,
+                if (!step.cost) {
+                  const stepCostUSD = Math.round(costPerStepUSD);
+                  const stepCostDest = Math.round(stepCostUSD * fxHomeToDest);
+                  step.cost = `${stepCostDest} ${destIso} ($${stepCostUSD} ${homeIso})`;
+                }
                 return step;
               });
             }
@@ -449,6 +454,18 @@ export async function POST(req: Request) {
           
           return day;
         });
+      }
+      
+      // Calculate and set proper grand total
+      if (parsedResponse.days && Array.isArray(parsedResponse.days)) {
+        const dailyBudgetUSD = form?.budgetPerDay || 100;
+        const totalDays = parsedResponse.days.length;
+        const grandTotalUSD = dailyBudgetUSD * totalDays;
+        const grandTotalDest = Math.round(grandTotalUSD * fxHomeToDest);
+        
+        parsedResponse.totalCost = `$${grandTotalUSD} ${homeIso}`;
+        parsedResponse.totalCostLocal = `$${grandTotalUSD} ${homeIso}`;
+        parsedResponse.totalCostDestination = `${grandTotalDest} ${destIso} ($${grandTotalUSD} ${homeIso})`;
       }
       
       return new Response(JSON.stringify(parsedResponse), {
@@ -577,18 +594,6 @@ export async function POST(req: Request) {
         const currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + i);
         const dateStr = currentDate.toISOString().split('T')[0];
-        
-        // Calculate and set proper grand total
-        if (parsedResponse.days && Array.isArray(parsedResponse.days)) {
-          const dailyBudgetUSD = form?.budgetPerDay || 100;
-          const totalDays = parsedResponse.days.length;
-          const grandTotalUSD = dailyBudgetUSD * totalDays;
-          const grandTotalDest = Math.round(grandTotalUSD * fxHomeToDest);
-          
-          parsedResponse.totalCost = `$${grandTotalUSD} ${homeIso}`;
-          parsedResponse.totalCostLocal = `$${grandTotalUSD} ${homeIso}`;
-          parsedResponse.totalCostDestination = `${grandTotalDest} ${destIso} ($${grandTotalUSD} ${homeIso})`;
-        }
         
         return {
           date: dateStr,

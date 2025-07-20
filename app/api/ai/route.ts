@@ -318,35 +318,41 @@ export async function POST(req: Request) {
                - Include snack breaks and rest periods
                - Plan activities to cover maximum area efficiently with logical routing
                - Group nearby attractions together to minimize travel time
-               - CRITICAL: Include specific costs in BOTH currencies for every activity
-               - MANDATORY: Daily total must equal approximately $${form.budgetPerDay} USD (${(form.budgetPerDay * fxHomeToDest).toFixed(0)} ${destIso})
-               - Each activity cost should be realistic and proportional to the daily budget
-               - Format costs as: "cost": "Amount ${destIso} (Amount ${homeIso})"
-               - Example: "cost": "150 EGP (3.75 USD)"
+               
+               MANDATORY COST REQUIREMENTS:
+               - EVERY SINGLE ACTIVITY must have a cost in BOTH currencies
+               - Daily total MUST EQUAL EXACTLY $${form.budgetPerDay} USD
+               - Daily total MUST EQUAL EXACTLY ${Math.round(form.budgetPerDay * fxHomeToDest)} ${destIso}
+               - Format daily costs as: "${Math.round(form.budgetPerDay * fxHomeToDest)} ${destIso} ($${form.budgetPerDay} ${homeIso})"
+               - Format activity costs as: "Amount ${destIso} ($Amount ${homeIso})"
+               - All step costs within a day must add up to the daily total
+               - Distribute costs logically: meals 40%, activities 35%, transport 15%, misc 10%
+               
                - Realistic transport options and times
                - Account for opening/closing times of attractions
                - Include evening activities and nightlife options
                - Consider ${form.travelVibe} pace and ${form.interests} interests
-               - Match ${form.accommodation} preference and $${form.dailyBudget} budget
+               - Match ${form.accommodation} preference and $${form.budgetPerDay} budget
                - Account for ${form.groupType} group dynamics
 
             8. FOOD RECOMMENDATIONS (MANDATORY 10 ITEMS):
                - EXACTLY 10 specific dishes/restaurants with ratings, sources AND prices
                - Must include: 2 street food items, 2 local restaurants, 2 traditional dishes, 2 popular chains/cafes, 1 fine dining, 1 local dessert/beverage
-               - Include specific pricing in BOTH currencies scaled to budget: "price": "Amount ${destIso} (Amount ${homeIso})"
-               - Example: "price": "25 EGP (0.60 USD)" for street food, "price": "120 EGP (3.00 USD)" for restaurant meal
+               - Include specific pricing in BOTH currencies scaled to budget: "price": "Amount ${destIso} ($Amount ${homeIso})"
+               - Example: "price": "${Math.round(25 * fxHomeToDest)} ${destIso} ($25 ${homeIso})" for street food
+               - Example: "price": "${Math.round(120 * fxHomeToDest)} ${destIso} ($120 ${homeIso})" for restaurant meal
                - Include ${form.dietary} options where relevant
                - Mix of price points within budget
                - Local specialties and where to find them
                - Include street food, traditional dishes, popular restaurants, local markets, desserts, and beverages
                - Provide variety across different meal types (breakfast, lunch, dinner, snacks)
 
-            DUAL CURRENCY DISPLAY REQUIREMENTS:
-            - Every cost must show both currencies: "Amount ${destIso} (Amount ${homeIso})"
-            - Use the exchange rates provided: 1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}
-            - Scale all costs to the $${form.budgetPerDay} USD daily budget provided
-            - Daily costs should total approximately $${form.budgetPerDay} USD (${(form.budgetPerDay * fxHomeToDest).toFixed(0)} ${destIso})
-            - Be consistent throughout the entire itinerary
+            CRITICAL BUDGET & CURRENCY REQUIREMENTS:
+            - EVERY cost must show both currencies: "Amount ${destIso} ($Amount ${homeIso})"
+            - Use the exchange rates: 1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}
+            - Daily costs MUST total EXACTLY $${form.budgetPerDay} USD (${Math.round(form.budgetPerDay * fxHomeToDest)} ${destIso})
+            - Grand total MUST be: $${form.budgetPerDay * duration} USD (${Math.round(form.budgetPerDay * duration * fxHomeToDest)} ${destIso})
+            - Be mathematically precise throughout the entire itinerary
             - Include costs for: meals, transportation, activities, accommodations, tips, shopping
 
             Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
@@ -420,22 +426,22 @@ export async function POST(req: Request) {
             day.cost = `${dailyCost} ${destIso} (${form?.budgetPerDay || 100} ${homeIso})`;
             console.log(`[AI] Added missing cost to day ${index + 1}: ${day.cost}`);
           }
-          
-          // Verify and fix step costs if missing
+              const dailyBudgetUSD = form?.budgetPerDay || 100;
+              const dailyCostDest = Math.round(dailyBudgetUSD * fxHomeToDest);
+              day.cost = `${dailyCostDest} ${destIso} ($${dailyBudgetUSD} ${homeIso})`;
           if (day.steps && Array.isArray(day.steps)) {
             let dailyTotal = 0;
             const stepsWithoutCost = day.steps.filter((step: any) => !step.cost).length;
-            
-            if (stepsWithoutCost > 0) {
-              const remainingBudget = (form?.budgetPerDay || 100) * 0.8; // 80% for activities
+               const dailyBudgetUSD = form?.budgetPerDay || 100;
+               const costPerStepUSD = dailyBudgetUSD / day.steps.length;
               const costPerStep = remainingBudget / day.steps.length;
               
               day.steps = day.steps.map((step: any) => {
-                if (!step.cost) {
+                   const stepCostUSD = Math.round(costPerStepUSD);
                   const stepCostUSD = Math.round(costPerStep);
-                  const stepCostDest = Math.round(stepCostUSD * fxHomeToDest);
+                   step.cost = `${stepCostDest} ${destIso} ($${stepCostUSD} ${homeIso})`;
                   step.cost = `${stepCostDest} ${destIso} (${stepCostUSD} ${homeIso})`;
-                }
+                price: `${baseCostDest} ${destIso} ($${baseCostUSD} ${homeIso})`,
                 return step;
               });
             }
@@ -571,6 +577,18 @@ export async function POST(req: Request) {
         const currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + i);
         const dateStr = currentDate.toISOString().split('T')[0];
+        
+        // Calculate and set proper grand total
+        if (parsedResponse.days && Array.isArray(parsedResponse.days)) {
+          const dailyBudgetUSD = form?.budgetPerDay || 100;
+          const totalDays = parsedResponse.days.length;
+          const grandTotalUSD = dailyBudgetUSD * totalDays;
+          const grandTotalDest = Math.round(grandTotalUSD * fxHomeToDest);
+          
+          parsedResponse.totalCost = `$${grandTotalUSD} ${homeIso}`;
+          parsedResponse.totalCostLocal = `$${grandTotalUSD} ${homeIso}`;
+          parsedResponse.totalCostDestination = `${grandTotalDest} ${destIso} ($${grandTotalUSD} ${homeIso})`;
+        }
         
         return {
           date: dateStr,

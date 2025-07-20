@@ -363,17 +363,19 @@ const StructuredContent: React.FC<StructuredContentProps> = ({ data, destination
           <div className="bg-gray-100 p-3 rounded-lg flex justify-between items-center mt-4">
             <span className="font-semibold">Estimated day total</span>
             <span className="font-bold text-lg text-green-600">
-              {day.cost || 'Cost calculation needed'}
+              {day.cost || `$${form?.budgetPerDay || 100} USD`}
             </span>
           </div>
         </div>
       ))}
 
       {/* Grand Total */}
-      {data.totalCost && (
+      {(data.totalCost || data.totalCostDestination) && (
         <div className="bg-blue-50 p-4 rounded-lg">
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Grand Total</h2>
-          <p className="text-2xl font-bold text-blue-600">{data.totalCost}</p>
+          <p className="text-2xl font-bold text-blue-600">
+            {data.totalCostDestination || data.totalCost || 'Calculating total...'}
+          </p>
         </div>
       )}
     </div>

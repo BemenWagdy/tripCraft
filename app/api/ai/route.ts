@@ -156,6 +156,14 @@ const schema = {
 export async function POST(req: Request) {
   let form;
   
+  // Check if GROQ API key is available
+  if (!process.env.GROQ_API_KEY) {
+    return NextResponse.json(
+      { error: 'GROQ API key is not configured. Please add GROQ_API_KEY to your environment variables.' },
+      { status: 500 }
+    );
+  }
+
   // Declare variables outside try block to prevent ReferenceError in catch
   let homeIso = 'USD';
   let destIso = 'USD'; 

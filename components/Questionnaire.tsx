@@ -123,22 +123,12 @@ export default function Questionnaire() {
         body: JSON.stringify(formData)
       });
 
-      // Read response body only once
-      const responseText = await response.text();
-      
       if (!response.ok) {
-        let errorMessage = 'Failed to generate itinerary';
-        try {
-          const errorData = JSON.parse(responseText);
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          errorMessage = responseText || errorMessage;
-        }
-        throw new Error(errorMessage);
+        const errorData = await response.json().catch(() => ({ error: 'Failed to generate itinerary' }));
+        throw new Error(errorData.error || 'Failed to generate itinerary');
       }
 
-      // Parse the response text as JSON
-      const data = JSON.parse(responseText);
+      const data = await response.json();
       setItinerary(JSON.stringify(data));
     } catch (err) {
       appendError(err, 'questionnaire-submit');

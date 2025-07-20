@@ -124,11 +124,28 @@ export default function Questionnaire() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to generate itinerary' }));
+        // 7. Empty-body bug fix - read response only once
+        let errorData;
+        if (!response.bodyUsed) {
+          try {
+            errorData = await response.json();
+          } catch {
+            errorData = { error: 'Failed to generate itinerary' };
+          }
+        } else {
+          throw new Error('Empty response body');
+        }
         throw new Error(errorData.error || 'Failed to generate itinerary');
       }
 
-      const data = await response.json();
+      // Read response only once
+      let data;
+      if (!response.bodyUsed) {
+        data = await response.json();
+      } else {
+        throw new Error('Empty response body');
+      }
+      
       setItinerary(JSON.stringify(data));
     } catch (err) {
       appendError(err, 'questionnaire-submit');

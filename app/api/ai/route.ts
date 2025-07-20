@@ -4,6 +4,7 @@ import { currencyCode } from '@/lib/currency';
 import { groq, GROQ_MODEL } from '@/lib/groq';
 import { appendError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
+import { parseCost } from '@/lib/costParser';
 
 const schema = {
   name: 'generate_itinerary',
@@ -190,35 +191,48 @@ export async function POST(req: Request) {
     homeIso = currencyCode(form.country) || 'USD';
     destIso = currencyCode(form.destination) || 'USD';
     
-    console.log(`[API] Currency mapping:`);
-    console.log(`[API] Country: "${form.country}" → ${homeIso}`);
-    console.log(`[API] Destination: "${form.destination}" → ${destIso}`);
+    // 8. Noise reduction - gate console logs in production
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API] Currency mapping:`);
+      console.log(`[API] Country: "${form.country}" → ${homeIso}`);
+      console.log(`[API] Destination: "${form.destination}" → ${destIso}`);
+    }
 
     // Make API calls if currencies are different
     if (homeIso !== destIso) {
-      console.log(`[API] Making Fixer.io API calls for ${homeIso} → ${destIso}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[API] Making Fixer.io API calls for ${homeIso} → ${destIso}`);
+      }
       
       try {
-        console.log(`[API] Getting ${homeIso} → ${destIso} rate`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[API] Getting ${homeIso} → ${destIso} rate`);
+        }
         const homeToDestResult = await getFxRate(homeIso, destIso);
         fxHomeToDest = homeToDestResult.rate;
         
-        console.log(`[API] Getting ${destIso} → ${homeIso} rate`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[API] Getting ${destIso} → ${homeIso} rate`);
+        }
         const destToHomeResult = await getFxRate(destIso, homeIso);
         fxDestToHome = destToHomeResult.rate;
         
         fxDate = homeToDestResult.date;
         fxNote = `Exchange rates updated ${fxDate}`;
         
-        console.log(`[API] Final rates: 1 ${homeIso} = ${fxHomeToDest} ${destIso}`);
-        console.log(`[API] Final rates: 1 ${destIso} = ${fxDestToHome} ${homeIso}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[API] Final rates: 1 ${homeIso} = ${fxHomeToDest} ${destIso}`);
+          console.log(`[API] Final rates: 1 ${destIso} = ${fxDestToHome} ${homeIso}`);
+        }
         
       } catch (err) {
         console.error('[API] FX lookup failed:', err);
         fxNote = 'Exchange rates unavailable';
       }
     } else {
-      console.log(`[API] Same currency, no conversion needed`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[API] Same currency, no conversion needed`);
+      }
       fxNote = 'Same currency';
     }
 
@@ -376,9 +390,131 @@ export async function POST(req: Request) {
     try {
       const parsedResponse = JSON.parse(toolCall.function.arguments);
       
+      // 2. Daily totals - fix cost calculations server-side
+      if (parsedResponse.days && Array.isArray(parsedResponse.days)) {
+        let grandTotalDest = 0;
+        let grandTotalHome = 0;
+        
+        parsedResponse.days = parsedResponse.days.map((day: any, index: number) => {
+          const dailyBudgetUSD = form.budgetPerDay || 100;
+          
+          // Sum all paid steps using parseCost helper
+          let dayTotalDest = 0;
+          let dayTotalHome = 0;
+          let paidSteps: any[] = [];
+          
+          if (day.steps && Array.isArray(day.steps)) {
+            day.steps.forEach((step: any) => {
+              if (step.cost && step.cost !== 'Free' && step.cost !== 'Included') {
+                const parsed = parseCost(step.cost, destIso, homeIso);
+                dayTotalDest += parsed.dest;
+                dayTotalHome += parsed.home;
+                paidSteps.push(step);
+              }
+            });
+          }
+          
+          // If sum ≠ target budgetPerDay (USD), adjust the last paid step
+          if (dayTotalHome !== dailyBudgetUSD && paidSteps.length > 0) {
+            const adjustment = dailyBudgetUSD - dayTotalHome;
+            const lastPaidStep = paidSteps[paidSteps.length - 1];
+            
+            const currentParsed = parseCost(lastPaidStep.cost, destIso, homeIso);
+            const newHomeAmount = Math.max(0, currentParsed.home + adjustment);
+            const newDestAmount = Math.round(newHomeAmount * fxHomeToDest);
+            
+            lastPaidStep.cost = `${newDestAmount} ${destIso} ($${newHomeAmount} ${homeIso})`;
+            
+            // Recalculate day totals
+            dayTotalDest = 0;
+            dayTotalHome = 0;
+            day.steps.forEach((step: any) => {
+              if (step.cost && step.cost !== 'Free' && step.cost !== 'Included') {
+                const parsed = parseCost(step.cost, destIso, homeIso);
+                dayTotalDest += parsed.dest;
+                dayTotalHome += parsed.home;
+              }
+            });
+          }
+          
+          // Write real sum back to day.cost in dual-currency format
+          day.cost = `${Math.round(dayTotalDest)} ${destIso} ($${Math.round(dayTotalHome)} ${homeIso})`;
+          
+          grandTotalDest += dayTotalDest;
+          grandTotalHome += dayTotalHome;
+          
+          return day;
+        });
+        
+        // 4. Currency sanity check
+        const expectedDestFromHome = grandTotalHome * fxHomeToDest;
+        if (Math.abs(grandTotalDest - expectedDestFromHome) > 1) {
+          // Tweak the first paid day by the difference
+          const difference = expectedDestFromHome - grandTotalDest;
+          const firstDay = parsedResponse.days.find((day: any) => 
+            day.steps && day.steps.some((step: any) => 
+              step.cost && step.cost !== 'Free' && step.cost !== 'Included'
+            )
+          );
+          
+          if (firstDay) {
+            const firstPaidStep = firstDay.steps.find((step: any) => 
+              step.cost && step.cost !== 'Free' && step.cost !== 'Included'
+            );
+            
+            if (firstPaidStep) {
+              const currentParsed = parseCost(firstPaidStep.cost, destIso, homeIso);
+              const newDestAmount = Math.max(0, currentParsed.dest + difference);
+              const newHomeAmount = Math.round(newDestAmount / fxHomeToDest);
+              
+              firstPaidStep.cost = `${Math.round(newDestAmount)} ${destIso} ($${newHomeAmount} ${homeIso})`;
+              grandTotalDest = expectedDestFromHome;
+            }
+          }
+        }
+        
+        // 3. Grand total - compute from actual sums, no shortcuts
+        parsedResponse.totalCost = `$${Math.round(grandTotalHome)} USD`;
+        parsedResponse.totalCostLocal = `$${Math.round(grandTotalHome)} USD`;
+        parsedResponse.totalCostDestination = `${Math.round(grandTotalDest)} ${destIso} ($${Math.round(grandTotalHome)} USD)`;
+      }
+      
+      // 5. Schema safety - force arrays and guarantee minimums
+      if (parsedResponse.visa) {
+        // Force additionalRequirements to be an array
+        if (!parsedResponse.visa.additionalRequirements) {
+          parsedResponse.visa.additionalRequirements = [];
+        } else if (typeof parsedResponse.visa.additionalRequirements === 'string') {
+          parsedResponse.visa.additionalRequirements = [parsedResponse.visa.additionalRequirements];
+        } else if (!Array.isArray(parsedResponse.visa.additionalRequirements)) {
+          parsedResponse.visa.additionalRequirements = [];
+        }
+      }
+      
+      // Guarantee beforeYouGo has ≥ 6 items
+      if (!parsedResponse.beforeYouGo) {
+        parsedResponse.beforeYouGo = [];
+      }
+      
+      const beforeYouGoDefaults = [
+        "Check current visa requirements on official embassy website",
+        "Purchase comprehensive travel insurance with medical coverage", 
+        "Notify your bank of international travel plans to prevent card blocks",
+        "Download offline maps and translation apps for navigation",
+        "Research local emergency numbers and save embassy contact information",
+        "Get appropriate power adapters and check voltage requirements"
+      ];
+      
+      while (parsedResponse.beforeYouGo.length < 6) {
+        const defaultIndex = parsedResponse.beforeYouGo.length % beforeYouGoDefaults.length;
+        parsedResponse.beforeYouGo.push(beforeYouGoDefaults[defaultIndex]);
+      }
+      
       // Post-process foodList to ensure minimum 10 items
       if (parsedResponse.foodList && parsedResponse.foodList.length < 10) {
-        console.log(`[AI] Only ${parsedResponse.foodList.length} food items generated, adding fallbacks`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[AI] Only ${parsedResponse.foodList.length} food items generated, adding fallbacks`);
+        }
         
         // Better fallback food items with proper pricing
         const fallbackFoods = [
@@ -421,111 +557,6 @@ export async function POST(req: Request) {
             source: 'Local recommendation'
           });
         }
-      }
-      
-      // Post-process days to ensure all have cost fields
-      if (parsedResponse.days && Array.isArray(parsedResponse.days)) {
-        parsedResponse.days = parsedResponse.days.map((day: any, index: number) => {
-          const dailyBudgetUSD = form?.budgetPerDay || 100;
-          const dailyCostDest = Math.round(dailyBudgetUSD * fxHomeToDest);
-          
-          if (!day.cost) {
-            day.cost = `${dailyCostDest} ${destIso} ($${dailyBudgetUSD} USD)`;
-            console.log(`[AI] Added missing cost to day ${index + 1}: ${day.cost}`);
-          } else {
-            // Ensure consistent formatting
-            day.cost = `${dailyCostDest} ${destIso} ($${dailyBudgetUSD} USD)`;
-          }
-          
-          // Fix step costs to ensure they add up correctly
-          if (day.steps && Array.isArray(day.steps)) {
-            // Calculate costs for steps that don't have them
-            const stepsWithCost = day.steps.filter((step: any) => 
-              step.cost && step.cost !== 'Free' && step.cost !== 'Included'
-            );
-            const stepsWithoutCost = day.steps.filter((step: any) => 
-              !step.cost || step.cost === 'Free' || step.cost === 'Included'
-            );
-            
-            if (stepsWithoutCost.length > 0) {
-              // Calculate remaining budget after existing costs
-              let usedBudget = 0;
-              stepsWithCost.forEach((step: any) => {
-                const costMatch = step.cost.match(/(\d+)\s*EUR/);
-                if (costMatch) {
-                  usedBudget += parseInt(costMatch[1]);
-                }
-              });
-              
-              const remainingBudgetDest = dailyCostDest - Math.round(usedBudget * fxHomeToDest);
-              const remainingBudgetUSD = dailyBudgetUSD - usedBudget;
-              
-              if (remainingBudgetUSD > 0 && stepsWithoutCost.length > 0) {
-                const costPerStepUSD = Math.floor(remainingBudgetUSD / stepsWithoutCost.length);
-                const costPerStepDest = Math.round(costPerStepUSD * fxHomeToDest);
-                
-                stepsWithoutCost.forEach((step: any, idx: number) => {
-                  if (step.cost !== 'Free' && step.cost !== 'Included') {
-                    // Distribute remaining budget among steps
-                    let stepCostUSD = costPerStepUSD;
-                    let stepCostDest = costPerStepDest;
-                    
-                    // Add remainder to last step
-                    if (idx === stepsWithoutCost.length - 1) {
-                      const totalAssigned = costPerStepUSD * stepsWithoutCost.length;
-                      stepCostUSD += remainingBudgetUSD - totalAssigned;
-                      stepCostDest = Math.round(stepCostUSD * fxHomeToDest);
-                    }
-                    
-                    step.cost = `${stepCostDest} ${destIso} ($${stepCostUSD} USD)`;
-                  }
-                });
-              }
-            }
-            
-            // Verify total matches expected budget
-            let calculatedTotal = 0;
-            day.steps.forEach((step: any) => {
-              if (step.cost && step.cost !== 'Free' && step.cost !== 'Included') {
-                const costMatch = step.cost.match(/\$(\d+)\s*USD/);
-                if (costMatch) {
-                  calculatedTotal += parseInt(costMatch[1]);
-                }
-              }
-            });
-              
-            // If total doesn't match, adjust the first paid activity
-            if (calculatedTotal !== dailyBudgetUSD) {
-              const adjustment = dailyBudgetUSD - calculatedTotal;
-              const firstPaidStep = day.steps.find((step: any) => 
-                step.cost && step.cost !== 'Free' && step.cost !== 'Included'
-              );
-              
-              if (firstPaidStep && adjustment !== 0) {
-                const currentMatch = firstPaidStep.cost.match(/\$(\d+)\s*USD/);
-                if (currentMatch) {
-                  const newCostUSD = parseInt(currentMatch[1]) + adjustment;
-                  const newCostDest = Math.round(newCostUSD * fxHomeToDest);
-                  firstPaidStep.cost = `${newCostDest} ${destIso} ($${newCostUSD} USD)`;
-                }
-              }
-            }
-          }
-          
-          return day;
-        });
-      }
-      
-      // Calculate and set proper grand total
-      if (parsedResponse.days && Array.isArray(parsedResponse.days)) {
-        const dailyBudgetUSD = form?.budgetPerDay || 100;
-        const totalDays = parsedResponse.days.length;
-        const grandTotalUSD = dailyBudgetUSD * totalDays;
-        const grandTotalDest = Math.round(grandTotalUSD * fxHomeToDest);
-        
-        parsedResponse.totalCost = `$${grandTotalUSD} USD`;
-        parsedResponse.totalCostLocal = `$${grandTotalUSD} USD`;  
-        parsedResponse.totalCostDestination = `${grandTotalDest} ${destIso} ($${grandTotalUSD} USD)`;
       }
       
       return new Response(JSON.stringify(parsedResponse), {

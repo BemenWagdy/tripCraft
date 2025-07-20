@@ -102,14 +102,16 @@ const StructuredContent: React.FC<StructuredContentProps> = ({ data, destination
             {data.visa.additionalRequirements && data.visa.additionalRequirements.length > 0 && (
               <div>
                 <span className="font-semibold">Required documents:</span>
-                <ul className="mt-2 space-y-1">
-                  {data.visa.additionalRequirements.map((req: string, index: number) => (
-                    <li key={index} className="flex items-start gap-2 ml-4">
-                      <span className="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2 flex-shrink-0"></span>
-                      <span className="text-gray-700">{req}</span>
-                    </li>
-                  ))}
-                </ul>
+                {Array.isArray(data.visa.additionalRequirements) && data.visa.additionalRequirements.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {data.visa.additionalRequirements.map((req: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2 ml-4">
+                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2 flex-shrink-0"></span>
+                        <span className="text-gray-700">{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
           </div>
@@ -185,56 +187,64 @@ const StructuredContent: React.FC<StructuredContentProps> = ({ data, destination
             {data.practicalInfo.simCardOptions && data.practicalInfo.simCardOptions.length > 0 && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-semibold mb-2">SIM Card Options</h3>
-                <ul className="space-y-1">
-                  {data.practicalInfo.simCardOptions.map((option: string, index: number) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-2 flex-shrink-0"></span>
-                      <span className="text-gray-700 text-sm">{option}</span>
-                    </li>
-                  ))}
-                </ul>
+                {Array.isArray(data.practicalInfo.simCardOptions) && (
+                  <ul className="space-y-1">
+                    {data.practicalInfo.simCardOptions.map((option: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-2 flex-shrink-0"></span>
+                        <span className="text-gray-700 text-sm">{option}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
             {data.practicalInfo.commonScams && data.practicalInfo.commonScams.length > 0 && (
               <div className="bg-red-50 rounded-lg p-4">
                 <h3 className="font-semibold mb-2 text-red-800">Common Scams to Avoid</h3>
-                <ul className="space-y-1">
-                  {data.practicalInfo.commonScams.map((scam: string, index: number) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <AlertTriangle className="h-3 w-3 text-red-500 mt-1 flex-shrink-0" />
-                      <span className="text-red-700 text-sm">{scam}</span>
-                    </li>
-                  ))}
-                </ul>
+                {Array.isArray(data.practicalInfo.commonScams) && (
+                  <ul className="space-y-1">
+                    {data.practicalInfo.commonScams.map((scam: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <AlertTriangle className="h-3 w-3 text-red-500 mt-1 flex-shrink-0" />
+                        <span className="text-red-700 text-sm">{scam}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
             {data.practicalInfo.safetyApps && data.practicalInfo.safetyApps.length > 0 && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-semibold mb-2">Recommended Safety Apps</h3>
-                <ul className="space-y-1">
-                  {data.practicalInfo.safetyApps.map((app: string, index: number) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full mt-2 flex-shrink-0"></span>
-                      <span className="text-gray-700 text-sm">{app}</span>
-                    </li>
-                  ))}
-                </ul>
+                {Array.isArray(data.practicalInfo.safetyApps) && (
+                  <ul className="space-y-1">
+                    {data.practicalInfo.safetyApps.map((app: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full mt-2 flex-shrink-0"></span>
+                        <span className="text-gray-700 text-sm">{app}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
             {data.practicalInfo.healthRequirements && data.practicalInfo.healthRequirements.length > 0 && (
               <div className="bg-blue-50 rounded-lg p-4">
                 <h3 className="font-semibold mb-2 text-blue-800">Health Requirements</h3>
-                <ul className="space-y-1">
-                  {data.practicalInfo.healthRequirements.map((req: string, index: number) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-                      <span className="text-blue-700 text-sm">{req}</span>
-                    </li>
-                  ))}
-                </ul>
+                {Array.isArray(data.practicalInfo.healthRequirements) && (
+                  <ul className="space-y-1">
+                    {data.practicalInfo.healthRequirements.map((req: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                        <span className="text-blue-700 text-sm">{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
           </div>

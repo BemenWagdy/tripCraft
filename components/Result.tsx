@@ -387,6 +387,9 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
                       ⭐ {food.rating} ({food.source})
                     </div>
                   </div>
+                  {food.price && (
+                    <div className="font-semibold text-green-600 text-sm mb-1">{food.price}</div>
+                  )}
                   {food.note && (
                     <p className="text-gray-600 text-sm">{food.note}</p>
                   )}
@@ -423,7 +426,7 @@ const Result: React.FC<ResultProps> = ({ itinerary, destination, onBack }) => {
                       {step.time && <strong>{step.time} – </strong>}
                       {step.text}
                       {step.mode && <span className="text-gray-500"> ({step.mode})</span>}
-                      {step.cost && <span className="font-medium text-green-600"> · {step.cost}</span>}
+                      {step.cost && <span className="font-bold text-green-600"> · {step.cost}</span>}
                     </span>
                   </div>
                   {step.mapLink && (

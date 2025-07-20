@@ -309,9 +309,10 @@ export async function POST(req: Request) {
                - Include snack breaks and rest periods
                - Plan activities to cover maximum area efficiently with logical routing
                - Group nearby attractions together to minimize travel time
-               - CRITICAL: Include specific costs in BOTH currencies for every activity
-               - Format costs as: "cost": "${destIso} amount (${homeIso} amount)"
-               - Example: "cost": "150 EGP (3.75 USD)", "costLocal": "3.75 USD", "costDestination": "150 EGP"
+               - CRITICAL: Include specific costs in BOTH currencies for every activity, scaled to the ${form.budgetPerDay} USD daily budget
+               - Format costs as: "cost": "Amount ${destIso} (Amount ${homeIso})"
+               - Example: "cost": "150 EGP (3.75 USD)"
+               - Daily total should approximate $${form.budgetPerDay} USD (${(form.budgetPerDay * fxHomeToDest).toFixed(0)} ${destIso})
                - Realistic transport options and times
                - Account for opening/closing times of attractions
                - Include evening activities and nightlife options
@@ -320,8 +321,9 @@ export async function POST(req: Request) {
                - Account for ${form.groupType} group dynamics
 
             8. FOOD RECOMMENDATIONS:
-               - Minimum 10 specific dishes/restaurants with ratings and sources
-               - Include specific pricing in BOTH currencies (e.g., "150 EGP (3.75 USD)", "25 AED (6.80 USD)")
+               - Minimum 10 specific dishes/restaurants with ratings, sources AND prices
+               - Include specific pricing in BOTH currencies scaled to budget: "price": "Amount ${destIso} (Amount ${homeIso})"
+               - Example: "price": "25 EGP (0.60 USD)" for street food, "price": "120 EGP (3.00 USD)" for restaurant meal
                - Include ${form.dietary} options where relevant
                - Mix of price points within budget
                - Local specialties and where to find them
@@ -329,12 +331,12 @@ export async function POST(req: Request) {
                - Provide variety across different meal types (breakfast, lunch, dinner, snacks)
 
             DUAL CURRENCY DISPLAY REQUIREMENTS:
-            - Every cost must show both currencies: destination currency first, then home currency in parentheses
+            - Every cost must show both currencies: "Amount ${destIso} (Amount ${homeIso})"
             - Use the exchange rates provided: 1 ${homeIso} = ${fxHomeToDest.toFixed(4)} ${destIso}
-            - Format: "Amount ${destIso} (Amount ${homeIso})"
+            - Scale all costs to the $${form.budgetPerDay} USD daily budget provided
+            - Daily costs should total approximately $${form.budgetPerDay} USD (${(form.budgetPerDay * fxHomeToDest).toFixed(0)} ${destIso})
             - Be consistent throughout the entire itinerary
             - Include costs for: meals, transportation, activities, accommodations, tips, shopping
-            - Show daily totals and grand total in both currencies
 
             Use current 2025 information and be as specific as possible. Think like a local expert helping a first-time visitor.
           `

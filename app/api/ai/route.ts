@@ -240,7 +240,7 @@ export async function POST(req: Request) {
             • Nationality/Passport: ${form.country}
             • Destination: ${form.destination}
             • Travel dates: ${form.dateRange.from} to ${form.dateRange.to} (${duration} days)
-            • Daily budget: $${form.dailyBudget}
+            • Daily budget: $${form.budgetPerDay}
             • Group type: ${form.groupType}
             • Travel style: ${form.travelVibe}
             • Interests: ${form.interests?.join(', ') || 'General sightseeing'}
@@ -658,7 +658,7 @@ export async function POST(req: Request) {
         return {
           date: dateStr,
           title: i === 0 ? "Arrival & Orientation" : i === duration - 1 ? "Final Day & Departure" : `Day ${i + 1} - Local Exploration`,
-          cost: `$${form?.dailyBudget || 100}`,
+          cost: `$${form?.budgetPerDay || 100}`,
           steps: [
             { time: "06:00", text: i === 0 ? "Arrive and complete immigration procedures" : "Early morning walk/exercise", mode: i === 0 ? "Flight" : "Walk", cost: i === 0 ? "Included" : "$0" },
             { time: "07:30", text: "Breakfast at local café", mode: "Walk", cost: "$8-12" },
@@ -675,9 +675,9 @@ export async function POST(req: Request) {
         };
       }),
 
-      totalCost: `$${(form?.dailyBudget || 100) * duration}`,
-      totalCostLocal: `$${(form?.dailyBudget || 100) * duration} USD`,
-      totalCostDestination: `${Math.round((form?.dailyBudget || 100) * duration * fxHomeToDest)} ${destIso}`,
+      totalCost: `$${(form?.budgetPerDay || 100) * duration}`,
+      totalCostLocal: `$${(form?.budgetPerDay || 100) * duration} USD`,
+      totalCostDestination: `${Math.round((form?.budgetPerDay || 100) * duration * fxHomeToDest)} ${destIso}`,
       currencies: { home: homeIso, destination: destIso, rate: fxHomeToDest },
       lastUpdated: fxDate
     };

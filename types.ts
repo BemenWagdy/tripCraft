@@ -8,7 +8,7 @@ export interface Step {
 
 export interface FormValues {
   destination: string;
-  dateRange: { from: Date; to: Date };
+  dateRange: { from: string; to: string };
   groupType: string;
   budgetPerDay: number;
   travelVibe: string;

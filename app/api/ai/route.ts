@@ -1,3 +1,4 @@
+import { FormValues } from '@/types';
 import { getFxRate } from '@/lib/fx';
 import { currencyCode } from '@/lib/currency';
 import { groq, GROQ_MODEL } from '@/lib/groq';
@@ -154,7 +155,7 @@ const schema = {
 };
 
 export async function POST(req: Request) {
-  let form;
+  let form: FormValues;
   
   // Check if GROQ API key is available
   if (!process.env.GROQ_API_KEY) {

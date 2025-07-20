@@ -136,7 +136,7 @@ const schema = {
                   cost: { type: 'string' },
                   costLocal: { type: 'string' },
                   costDestination: { type: 'string' }
-                }
+                },
                 required: ['text']
               }
             }
